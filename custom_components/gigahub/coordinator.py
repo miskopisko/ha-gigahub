@@ -14,7 +14,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .api import GigaHubApi, GigaHubAuthError, GigaHubConnectionError
 from .const import CONF_DEVICE_NAMES, DOMAIN
-from .parse import FastSnapshot, Host, SlowSnapshot, TrafficLedger, assign_names, rate_mbps
+from .parse import FastSnapshot, Host, RollingRate, SlowSnapshot, TrafficLedger, assign_names
 
 if TYPE_CHECKING:
     from . import GigaHubConfigEntry
@@ -22,6 +22,10 @@ if TYPE_CHECKING:
 _LOGGER = logging.getLogger(__name__)
 STORAGE_VERSION = 1
 LEDGER_SAVE_DELAY = 60  # seconds; the ledger changes every poll, so debounce writes
+# Rolling windows for live speeds. The hub syncs fibre, port and Wi-Fi counters about
+# every 10 s; the internet (PPP) counter lands in irregular batches 15-25 s late.
+FIBRE_WINDOW = 20
+INTERNET_WINDOW = 60
 
 
 @dataclass(slots=True)
@@ -49,7 +53,7 @@ class GigaHubFastCoordinator(DataUpdateCoordinator[FastData]):
             update_interval=timedelta(seconds=interval),
         )
         self.api = api
-        self._previous: tuple[FastData, float] | None = None
+        self._rates: dict[str, RollingRate] = {}
         # Set by the speed test runner while a test is in flight.
         self.excluding_speed_test = False
         self._ledger_store: Store[dict[str, int | None]] = Store(
@@ -76,36 +80,23 @@ class GigaHubFastCoordinator(DataUpdateCoordinator[FastData]):
         self._ledger_store.async_delay_save(ledger.as_dict, LEDGER_SAVE_DELAY)
         data = FastData(snapshot=snapshot, bytes_received=received, bytes_sent=sent)
 
-        rates = data.rates
-        if self._previous is not None:
-            old_data, old_at = self._previous
-            old = old_data.snapshot
-            seconds = taken_at - old_at
-            rates["wan_download"] = rate_mbps(received, old_data.bytes_received, seconds)
-            rates["wan_upload"] = rate_mbps(sent, old_data.bytes_sent, seconds)
-            for band, traffic in snapshot.wifi_traffic.items():
-                old_traffic = old.wifi_traffic.get(band)
-                if old_traffic is None:
-                    continue
-                # From the hub's side, "sent" is towards the Wi-Fi clients.
-                rates[f"radio_{band}_download"] = rate_mbps(
-                    traffic.bytes_sent, old_traffic.bytes_sent, seconds
-                )
-                rates[f"radio_{band}_upload"] = rate_mbps(
-                    traffic.bytes_received, old_traffic.bytes_received, seconds
-                )
-            old_ports = {p.number: p for p in old.ports}
-            for port in snapshot.ports:
-                old_port = old_ports.get(port.number)
-                if old_port is None:
-                    continue
-                rates[f"port_{port.number}_download"] = rate_mbps(
-                    port.bytes_sent, old_port.bytes_sent, seconds
-                )
-                rates[f"port_{port.number}_upload"] = rate_mbps(
-                    port.bytes_received, old_port.bytes_received, seconds
-                )
-        self._previous = (data, taken_at)
+        # From the hub's side, "sent" is towards the house (download).
+        counters: dict[str, tuple[int | None, float]] = {
+            "wan_download": (received, INTERNET_WINDOW),
+            "wan_upload": (sent, INTERNET_WINDOW),
+        }
+        if snapshot.optical:
+            counters["fibre_download"] = (snapshot.optical.bytes_received, FIBRE_WINDOW)
+            counters["fibre_upload"] = (snapshot.optical.bytes_sent, FIBRE_WINDOW)
+        for band, traffic in snapshot.wifi_traffic.items():
+            counters[f"radio_{band}_download"] = (traffic.bytes_sent, FIBRE_WINDOW)
+            counters[f"radio_{band}_upload"] = (traffic.bytes_received, FIBRE_WINDOW)
+        for port in snapshot.ports:
+            counters[f"port_{port.number}_download"] = (port.bytes_sent, FIBRE_WINDOW)
+            counters[f"port_{port.number}_upload"] = (port.bytes_received, FIBRE_WINDOW)
+        for key, (value, window) in counters.items():
+            tracker = self._rates.setdefault(key, RollingRate(window))
+            data.rates[key] = tracker.update(taken_at, value)
         return data
 
 

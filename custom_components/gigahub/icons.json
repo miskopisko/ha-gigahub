@@ -126,6 +126,21 @@
       },
       "port_upload": {
         "default": "mdi:upload-network-outline"
+      },
+      "fibre_download_speed": {
+        "default": "mdi:download-network"
+      },
+      "fibre_upload_speed": {
+        "default": "mdi:upload-network"
+      }
+    },
+    "select": {
+      "live_speed_source": {
+        "default": "mdi:chart-timeline-variant",
+        "state": {
+          "fibre": "mdi:led-on",
+          "internet": "mdi:web"
+        }
       }
     }
   }

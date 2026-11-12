@@ -59,6 +59,35 @@ def normalize_mac(mac: str | None) -> str:
     return (mac or "").strip().lower()
 
 
+class RollingRate:
+    """Mbit/s over a sliding window of at least `window` seconds.
+
+    The hub only refreshes its byte counters every ~10 s (and the internet counter in
+    lumpy 15-25 s batches), so a rate over a single short poll swings between 0 and
+    double. Measuring against the newest sample that is at least `window` old keeps the
+    reading steady while it still updates on every poll.
+    """
+
+    def __init__(self, window: float) -> None:
+        self.window = window
+        self._samples: list[tuple[float, int]] = []
+
+    def update(self, at: float, value: int | None) -> float | None:
+        if value is None:
+            return None
+        if self._samples and value < self._samples[-1][1]:
+            self._samples.clear()  # counter reset (hub reboot)
+        self._samples.append((at, value))
+        old = [s for s in self._samples if at - s[0] >= self.window]
+        if old:
+            # Keep one sample at or beyond the window edge, drop anything older.
+            self._samples = self._samples[self._samples.index(old[-1]) :]
+            base_at, base = old[-1]
+        else:
+            base_at, base = self._samples[0]
+        return rate_mbps(value, base, at - base_at) if at > base_at else None
+
+
 def rate_mbps(new: int | None, old: int | None, seconds: float) -> float | None:
     """Average Mbit/s between two byte counters. None after a counter reset."""
     if new is None or old is None or seconds <= 0 or new < old:
@@ -144,6 +173,11 @@ class OpticalStatus:
     errors_received: int | None
     errors_sent: int | None
     module: str | None
+    # Everything on the fibre: internet plus Fibe TV, voice and Bell's own services.
+    # The hub syncs these about every 10 s, while the PPP (internet) counters arrive in
+    # irregular batches 15-25 s late, so these are the better source for live speed.
+    bytes_received: int | None = None
+    bytes_sent: int | None = None
 
 
 @dataclass(slots=True)
@@ -257,6 +291,8 @@ def parse_optical(raw: Any) -> OpticalStatus | None:
         errors_received=_int(stats.get("errors_received")),
         errors_sent=_int(stats.get("errors_sent")),
         module=f"{vendor} {part}".strip() or None,
+        bytes_received=_int(stats.get("bytes_received")),
+        bytes_sent=_int(stats.get("bytes_sent")),
     )
 
 

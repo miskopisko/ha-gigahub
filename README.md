@@ -10,7 +10,10 @@ what the hub's own speed test says your line can do, and how well every Wi-Fi cl
 ## What you get
 
 **Internet**
-- Download / upload speed (Mbit/s, averaged over each poll)
+- Live download / upload speed, two ways (see *Fibre vs internet speed* below):
+  - *Fibre download / upload speed*: prompt, but includes Fibe TV and voice
+  - *Download / upload speed*: internet only, but the hub reports it late and in lumps
+- A *Live speed source* selector so a dashboard can switch its live graph between the two
 - Data downloaded / uploaded (total counters, so daily and monthly usage come straight out of
   Home Assistant's statistics)
 - Internet connectivity, status, connected since, public IP
@@ -135,8 +138,29 @@ actions:
   Assistant's statistics handle the reset without a negative day.
 - **One login session.** The integration keeps one session open and serialises its requests. Logging
   in to the hub's web page at the same time works fine.
-- **Speeds are averages** over the polling interval, so short bursts are smoothed out. Lower the
-  interval if you want spikier graphs.
+- **Speeds are rolling averages**: fibre, port and Wi-Fi speeds over the last ~20 s, internet
+  speed over the last ~60 s. They refresh on every poll.
+
+## Fibre vs internet speed
+
+The hub keeps two sets of traffic counters, and they behave very differently:
+
+| | Fibre counter | Internet (PPP) counter |
+|---|---|---|
+| Counts | everything on the fibre: internet, Fibe TV, home phone, Bell services | internet only |
+| Updated | about every 10 s | in irregular batches, 15-25 s late |
+| A steady 300 Mbit/s download, sampled every 5 s, looks like | 585, 0, 691, 0, 627, 0 (≈ 300 averaged) | 198, 0, 0, 1252, 0, 0, 0, then 519 *after* the download ended |
+
+So the **fibre** sensors are the better live view (a 20-s rolling average tracks real traffic
+closely), and the **internet** sensors are right over a minute or more but lumpy moment to moment.
+*Data downloaded / uploaded* use the internet counter, because lateness doesn't matter for totals
+and it leaves TV out of your usage.
+
+During one of the hub's own speed tests, the fibre speed shows the test's real ~3 Gbit/s, while
+the internet speed and data totals leave it out.
+
+For a properly live graph, set the traffic polling interval to 10 s (the hub's own update rate).
+It's a 0.3-s request, so the load on the hub stays small.
 
 ## Development
 

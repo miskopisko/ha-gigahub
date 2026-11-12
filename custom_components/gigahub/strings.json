@@ -107,6 +107,12 @@
       "upload_speed": {
         "name": "Upload speed"
       },
+      "fibre_download_speed": {
+        "name": "Fibre download speed"
+      },
+      "fibre_upload_speed": {
+        "name": "Fibre upload speed"
+      },
       "data_downloaded": {
         "name": "Data downloaded"
       },
@@ -205,6 +211,15 @@
       },
       "port_upload": {
         "name": "LAN port {port} upload"
+      }
+    },
+    "select": {
+      "live_speed_source": {
+        "name": "Live speed source",
+        "state": {
+          "fibre": "Fibre (prompt, includes TV)",
+          "internet": "Internet (internet only, lags)"
+        }
       }
     }
   },

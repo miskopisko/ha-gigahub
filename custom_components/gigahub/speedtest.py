@@ -13,8 +13,9 @@ from .coordinator import GigaHubFastCoordinator, GigaHubSlowCoordinator
 
 _LOGGER = logging.getLogger(__name__)
 
-# The hub's counters trail the traffic slightly; keep excluding a little past the end.
-SETTLE_SECONDS = 5
+# The hub's internet counters land in batches up to ~25 s late; keep excluding until the
+# test's last bytes have been counted.
+SETTLE_SECONDS = 30
 
 
 class SpeedTestRunner:

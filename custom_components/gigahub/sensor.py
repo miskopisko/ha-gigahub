@@ -78,6 +78,8 @@ def _rate(key: str, translation_key: str, **kwargs: Any) -> FastSensorDescriptio
 INTERNET: tuple[FastSensorDescription, ...] = (
     _rate("wan_download", "download_speed"),
     _rate("wan_upload", "upload_speed"),
+    _rate("fibre_download", "fibre_download_speed"),
+    _rate("fibre_upload", "fibre_upload_speed"),
     FastSensorDescription(
         key="data_downloaded",
         translation_key="data_downloaded",

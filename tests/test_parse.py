@@ -409,3 +409,41 @@ def test_assign_names_survives_lookup_errors() -> None:
 
     parse.assign_names(snap, broken, None)
     assert snap.hosts[0].name == "48:A5:E7:12:34:56"
+
+
+MB = 1_000_000
+
+
+def test_optical_byte_counters() -> None:
+    raw = {
+        "optical": {
+            "interface": {
+                **FAST_RAW["optical"]["interface"],
+                "stats": {"bytes_received": "123", "bytes_sent": "45"},
+            }
+        }
+    }
+    optical = parse.parse_fast(raw).optical
+    assert (optical.bytes_received, optical.bytes_sent) == (123, 45)
+
+
+def test_rolling_rate_smooths_batched_counters() -> None:
+    # 300 Mbit/s of real traffic, but the hub only publishes the counter every 10 s,
+    # and we poll every 10 s slightly out of phase: per-poll deltas go 0, 750 MB, 0, ...
+    rate = parse.RollingRate(window=20)
+    counter, readings = 0, []
+    for i in range(12):
+        if i % 2 == 1:
+            counter += 750 * MB  # two 10-s syncs' worth at once
+        readings.append(rate.update(i * 10.0, counter))
+    steady = readings[3:]
+    assert all(r is not None and 270 <= r <= 330 for r in steady), steady
+
+
+def test_rolling_rate_first_reading_and_reset() -> None:
+    rate = parse.RollingRate(window=20)
+    assert rate.update(0.0, 1000) is None  # nothing to compare against yet
+    assert rate.update(10.0, 1000 + 125 * MB) == 100.0  # uses what it has before the window fills
+    # Counter drops (hub reboot): start over rather than report a negative rate.
+    assert rate.update(20.0, 5) is None
+    assert rate.update(30.0, 5 + 125 * MB) == 100.0

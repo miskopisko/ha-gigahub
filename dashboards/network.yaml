@@ -19,40 +19,92 @@ sections:
       - type: tile
         entity: sensor.giga_hub_connected_since
         name: Connected since
-      - type: custom:mini-graph-card
-        name: Speed (live)
-        icon: mdi:swap-vertical
-        hours_to_show: 6
-        points_per_hour: 120
-        line_width: 2
-        smoothing: true
-        show:
-          fill: fade
-          legend: true
-          extrema: true
-        entities:
-          - entity: sensor.giga_hub_download_speed
-            name: Download
-          - entity: sensor.giga_hub_upload_speed
-            name: Upload
+      - type: tile
+        entity: select.giga_hub_live_speed_source
+        name: Live graph
+        features_position: inline
+        features:
+          - type: select-options
         grid_options:
           columns: full
-      - type: custom:mini-graph-card
-        name: Speed (24 h, 5-min peaks)
-        hours_to_show: 24
-        points_per_hour: 12
-        aggregate_func: max
-        line_width: 2
-        show:
-          fill: fade
-          legend: false
-        entities:
-          - entity: sensor.giga_hub_download_speed
-            name: Download
-          - entity: sensor.giga_hub_upload_speed
-            name: Upload
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: select.giga_hub_live_speed_source
+            state: fibre
         grid_options:
           columns: full
+        card:
+          type: vertical-stack
+          cards:
+            - type: custom:mini-graph-card
+              name: Speed (live, fibre)
+              icon: mdi:swap-vertical
+              hours_to_show: 3
+              points_per_hour: 360
+              line_width: 2
+              show:
+                fill: fade
+                legend: true
+                extrema: true
+              entities:
+                - entity: sensor.giga_hub_fibre_download_speed
+                  name: Download
+                - entity: sensor.giga_hub_fibre_upload_speed
+                  name: Upload
+            - type: custom:mini-graph-card
+              name: Speed (24 h, 5-min peaks)
+              hours_to_show: 24
+              points_per_hour: 12
+              aggregate_func: max
+              line_width: 2
+              show:
+                fill: fade
+                legend: false
+              entities:
+                - entity: sensor.giga_hub_fibre_download_speed
+                  name: Download
+                - entity: sensor.giga_hub_fibre_upload_speed
+                  name: Upload
+      - type: conditional
+        conditions:
+          - condition: state
+            entity: select.giga_hub_live_speed_source
+            state: internet
+        grid_options:
+          columns: full
+        card:
+          type: vertical-stack
+          cards:
+            - type: custom:mini-graph-card
+              name: Speed (live, internet)
+              icon: mdi:swap-vertical
+              hours_to_show: 3
+              points_per_hour: 120
+              line_width: 2
+              show:
+                fill: fade
+                legend: true
+                extrema: true
+              entities:
+                - entity: sensor.giga_hub_download_speed
+                  name: Download
+                - entity: sensor.giga_hub_upload_speed
+                  name: Upload
+            - type: custom:mini-graph-card
+              name: Speed (24 h, 5-min peaks)
+              hours_to_show: 24
+              points_per_hour: 12
+              aggregate_func: max
+              line_width: 2
+              show:
+                fill: fade
+                legend: false
+              entities:
+                - entity: sensor.giga_hub_download_speed
+                  name: Download
+                - entity: sensor.giga_hub_upload_speed
+                  name: Upload
 
   - type: grid
     cards:

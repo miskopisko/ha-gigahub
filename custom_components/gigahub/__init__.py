@@ -24,7 +24,13 @@ from .const import (
 from .coordinator import GigaHubFastCoordinator, GigaHubSlowCoordinator
 from .speedtest import SpeedTestRunner
 
-PLATFORMS = [Platform.BINARY_SENSOR, Platform.BUTTON, Platform.EVENT, Platform.SENSOR]
+PLATFORMS = [
+    Platform.BINARY_SENSOR,
+    Platform.BUTTON,
+    Platform.EVENT,
+    Platform.SELECT,
+    Platform.SENSOR,
+]
 
 
 @dataclass(slots=True)
