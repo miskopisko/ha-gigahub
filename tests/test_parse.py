@@ -447,3 +447,48 @@ def test_rolling_rate_first_reading_and_reset() -> None:
     # Counter drops (hub reboot): start over rather than report a negative rate.
     assert rate.update(20.0, 5) is None
     assert rate.update(30.0, 5 + 125 * MB) == 100.0
+
+
+def _client(mac: str, down: int, up: int) -> object:
+    return parse.WifiClient(mac, "5g", -60, "ax", 600, 600, bytes_down=down, bytes_up=up)
+
+
+def test_wifi_client_counters_parsed() -> None:
+    raw = [
+        {
+            **ASSOC_5G[0],
+            "stats": {"bytes_sent": "5000", "bytes_received": "700"},
+            "association_time": "2026-11-12T07:40:38-0500",
+        }
+    ]
+    client = parse.parse_wifi_clients(raw, "5g")[0]
+    assert (client.bytes_down, client.bytes_up) == (5000, 700)
+    assert client.connected_since == "2026-11-12T07:40:38-0500"
+
+
+def test_device_traffic_rates_and_totals() -> None:
+    tracker = parse.DeviceTrafficTracker()
+    first = tracker.update([_client("aa", 1000 * MB, 10 * MB)], at=0.0)
+    assert first["aa"].download_mbps is None  # nothing to compare with yet
+    assert first["aa"].total_down == 1000 * MB  # starts from this connection's usage
+
+    second = tracker.update([_client("aa", 1000 * MB + 375 * MB, 10 * MB + 75 * MB)], at=300.0)
+    assert second["aa"].download_mbps == 10.0  # 375 MB over 5 minutes
+    assert second["aa"].upload_mbps == 2.0
+    assert second["aa"].total_down == 1375 * MB
+
+
+def test_device_traffic_survives_reconnect_and_restart() -> None:
+    tracker = parse.DeviceTrafficTracker()
+    tracker.update([_client("aa", 900 * MB, 0)], at=0.0)
+    # The device reconnected: its counters restarted, and it has used 50 MB since.
+    after = tracker.update([_client("aa", 50 * MB, 0)], at=300.0)
+    assert after["aa"].total_down == 950 * MB
+
+    # Home Assistant restarts: the totals come back from storage.
+    restored = parse.DeviceTrafficTracker(tracker.as_dict())
+    later = restored.update([_client("aa", 80 * MB, 0)], at=10.0)
+    assert later["aa"].total_down == 980 * MB
+    assert later["aa"].download_mbps is None  # no timing reference after a restart
+    assert restored.totals("aa") == (980 * MB, 0)
+    assert restored.totals("bb") is None

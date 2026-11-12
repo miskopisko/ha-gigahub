@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from dataclasses import dataclass, field
 from datetime import timedelta
 from typing import TYPE_CHECKING
@@ -14,7 +15,15 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .api import GigaHubApi, GigaHubAuthError, GigaHubConnectionError
 from .const import CONF_DEVICE_NAMES, DOMAIN
-from .parse import FastSnapshot, Host, RollingRate, SlowSnapshot, TrafficLedger, assign_names
+from .parse import (
+    DeviceTrafficTracker,
+    FastSnapshot,
+    Host,
+    RollingRate,
+    SlowSnapshot,
+    TrafficLedger,
+    assign_names,
+)
 
 if TYPE_CHECKING:
     from . import GigaHubConfigEntry
@@ -121,6 +130,10 @@ class GigaHubSlowCoordinator(DataUpdateCoordinator[SlowSnapshot]):
         )
         self._known: set[str] | None = None
         self._vendor_lookup = None
+        self._traffic_store: Store[dict] = Store(
+            hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}.device_traffic"
+        )
+        self.traffic: DeviceTrafficTracker | None = None
         # Drained by the event entity. A queue, because the first refresh runs
         # before the entity exists and its findings must not be lost.
         self.pending_new_devices: list[Host] = []
@@ -140,6 +153,10 @@ class GigaHubSlowCoordinator(DataUpdateCoordinator[SlowSnapshot]):
             self._vendor_lookup or None,
             self.config_entry.options.get(CONF_DEVICE_NAMES),
         )
+        if self.traffic is None:
+            self.traffic = DeviceTrafficTracker(await self._traffic_store.async_load())
+        snapshot.device_traffic = self.traffic.update(snapshot.wifi_clients, time.monotonic())
+        self._traffic_store.async_delay_save(self.traffic.as_dict, LEDGER_SAVE_DELAY)
         await self._track_new_devices(snapshot)
         return snapshot
 

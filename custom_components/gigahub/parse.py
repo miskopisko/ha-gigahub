@@ -494,6 +494,10 @@ class WifiClient:
     standard: str | None
     downlink_mbps: int | None
     uplink_mbps: int | None
+    # Byte counters since this device last associated (they restart on reconnect).
+    bytes_down: int | None = None  # hub -> device
+    bytes_up: int | None = None  # device -> hub
+    connected_since: str | None = None  # ISO 8601 with offset, as the hub reports it
 
 
 @dataclass(slots=True)
@@ -518,6 +522,8 @@ class SlowSnapshot:
     names: dict[str, str] = field(default_factory=dict)
     vendors: dict[str, str] = field(default_factory=dict)
     namer: Callable[[str], str] | None = None
+    # Filled in by the coordinator from DeviceTrafficTracker.
+    device_traffic: dict[str, DeviceTraffic] = field(default_factory=dict)
 
     @property
     def active_hosts(self) -> list[Host]:
@@ -580,6 +586,7 @@ def parse_wifi_clients(raw: Any, band: str) -> list[WifiClient]:
             continue
         down = _int(device.get("last_data_downlink_rate"))
         up = _int(device.get("last_data_uplink_rate"))
+        stats = device.get("stats") or {}
         result.append(
             WifiClient(
                 mac=normalize_mac(device.get("mac_address")),
@@ -589,9 +596,68 @@ def parse_wifi_clients(raw: Any, band: str) -> list[WifiClient]:
                 # Link rates are reported in kbit/s.
                 downlink_mbps=None if down is None else down // 1000,
                 uplink_mbps=None if up is None else up // 1000,
+                bytes_down=_int(stats.get("bytes_sent")),
+                bytes_up=_int(stats.get("bytes_received")),
+                connected_since=device.get("association_time") or None,
             )
         )
     return result
+
+
+@dataclass(slots=True)
+class DeviceTraffic:
+    download_mbps: float | None  # average since the previous device-list poll
+    upload_mbps: float | None
+    total_down: int  # bytes, accumulated across reconnects
+    total_up: int
+
+
+class DeviceTrafficTracker:
+    """Per-device Wi-Fi traffic from the hub's association counters.
+
+    The counters restart from zero whenever a device reconnects, so running totals add
+    up the increases and, after a restart, the new counter's whole value.
+    """
+
+    def __init__(self, state: dict[str, Any] | None = None) -> None:
+        state = state or {}
+        # mac -> [last_down, last_up, total_down, total_up]
+        self._devices: dict[str, list[int]] = {
+            mac: [int(v) for v in values] for mac, values in (state.get("devices") or {}).items()
+        }
+        self._last_at: dict[str, float] = {}
+
+    def update(self, clients: list[WifiClient], at: float) -> dict[str, DeviceTraffic]:
+        result: dict[str, DeviceTraffic] = {}
+        for client in clients:
+            if client.bytes_down is None or client.bytes_up is None:
+                continue
+            down, up = client.bytes_down, client.bytes_up
+            known = self._devices.get(client.mac)
+            seconds = at - self._last_at[client.mac] if client.mac in self._last_at else 0
+            if known is None:
+                # First sight: start the totals from what it's used this connection.
+                self._devices[client.mac] = [down, up, down, up]
+                rate_down = rate_up = None
+            else:
+                last_down, last_up, total_down, total_up = known
+                reconnected = down < last_down or up < last_up
+                add_down = down if reconnected else down - last_down
+                add_up = up if reconnected else up - last_up
+                self._devices[client.mac] = [down, up, total_down + add_down, total_up + add_up]
+                rate_down = round(add_down * 8 / seconds / 1e6, 3) if seconds > 0 else None
+                rate_up = round(add_up * 8 / seconds / 1e6, 3) if seconds > 0 else None
+            self._last_at[client.mac] = at
+            _, _, total_down, total_up = self._devices[client.mac]
+            result[client.mac] = DeviceTraffic(rate_down, rate_up, total_down, total_up)
+        return result
+
+    def totals(self, mac: str) -> tuple[int, int] | None:
+        known = self._devices.get(mac)
+        return (known[2], known[3]) if known else None
+
+    def as_dict(self) -> dict[str, Any]:
+        return {"devices": self._devices}
 
 
 def parse_speed_test(raw: Any) -> tuple[SpeedTestResult | None, str | None]:

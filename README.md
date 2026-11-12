@@ -36,6 +36,15 @@ what the hub's own speed test says your line can do, and how well every Wi-Fi cl
 - Weakest client signal, so you can see which device needs a better spot
 - Wi-Fi devices on pods: Wi-Fi devices the hub knows about that aren't on its own radios
 
+**Per-device Wi-Fi traffic**
+- *Busiest Wi-Fi device*: the device using the most right now; its attributes list every Wi-Fi
+  device on the hub's radios with download/upload speed (5-minute averages), data used since it
+  connected, band and signal
+- For every Wi-Fi device you name (see Options): its own device in Home Assistant with download and
+  upload speed, data downloaded / uploaded (running totals that survive reconnects and restarts, so
+  they get daily and monthly statistics) and Wi-Fi signal
+- Devices connected through a Bell Wi-Fi pod aren't included: the hub doesn't count their traffic
+
 **Devices and hub**
 - Devices connected, wired, Wi-Fi (names as attributes)
 - Friendly device names: when the hub only knows a MAC address, the device is named after its
@@ -60,7 +69,7 @@ what the hub's own speed test says your line can do, and how well every Wi-Fi cl
 **Save and close**.
 
 **Name devices**: pick a device from the list (it shows each one's MAC address, manufacturer and
-connection) and type a name. Name as many as you like before saving. Names are stored in Home
+connection) and type a name. Named Wi-Fi devices also get their own traffic sensors. Name as many as you like before saving. Names are stored in Home
 Assistant, not on the hub; a name set in the hub's own web page is used when you haven't set one
 here. Leave the name empty to go back to the automatic name.
 
@@ -138,6 +147,11 @@ actions:
   Assistant's statistics handle the reset without a negative day.
 - **One login session.** The integration keeps one session open and serialises its requests. Logging
   in to the hub's web page at the same time works fine.
+- **Load on the hub.** The traffic poll is one ~35 KB request answered in ~0.3 s. The device list
+  poll is two requests totalling ~8.5 s and ~560 KB, mostly because the hub keeps a long history of
+  past devices and Wi-Fi connections that can't be filtered out. That's a few percent of the hub's
+  admin web server, and none of its packet forwarding (which runs in hardware). Requests time out
+  after 45 s.
 - **Speeds are rolling averages**: fibre, port and Wi-Fi speeds over the last ~20 s, internet
   speed over the last ~60 s. They refresh on every poll.
 

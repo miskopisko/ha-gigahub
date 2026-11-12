@@ -211,6 +211,24 @@
       },
       "port_upload": {
         "name": "LAN port {port} upload"
+      },
+      "busiest_wifi_device": {
+        "name": "Busiest Wi-Fi device"
+      },
+      "client_download_speed": {
+        "name": "Download speed"
+      },
+      "client_upload_speed": {
+        "name": "Upload speed"
+      },
+      "client_data_downloaded": {
+        "name": "Data downloaded"
+      },
+      "client_data_uploaded": {
+        "name": "Data uploaded"
+      },
+      "client_signal": {
+        "name": "Wi-Fi signal"
       }
     },
     "select": {

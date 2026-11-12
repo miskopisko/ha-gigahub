@@ -104,5 +104,5 @@ async def async_remove_entry(hass: HomeAssistant, entry: GigaHubConfigEntry) -> 
     """Forget the stored device list and traffic ledger when the integration is deleted."""
     from homeassistant.helpers.storage import Store
 
-    for name in ("known_devices", "traffic_ledger"):
+    for name in ("known_devices", "traffic_ledger", "device_traffic"):
         await Store(hass, 1, f"{DOMAIN}.{entry.entry_id}.{name}").async_remove()

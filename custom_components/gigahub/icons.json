@@ -132,6 +132,24 @@
       },
       "fibre_upload_speed": {
         "default": "mdi:upload-network"
+      },
+      "busiest_wifi_device": {
+        "default": "mdi:trophy-outline"
+      },
+      "client_download_speed": {
+        "default": "mdi:download-network"
+      },
+      "client_upload_speed": {
+        "default": "mdi:upload-network"
+      },
+      "client_data_downloaded": {
+        "default": "mdi:download"
+      },
+      "client_data_uploaded": {
+        "default": "mdi:upload"
+      },
+      "client_signal": {
+        "default": "mdi:wifi"
       }
     },
     "select": {

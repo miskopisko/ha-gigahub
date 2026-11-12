@@ -8,8 +8,9 @@ import time
 from dataclasses import dataclass
 from typing import Any
 
-from aiohttp import ClientError
+from aiohttp import ClientError, ClientSession, ClientTimeout, CookieJar
 from sagemcom_api.client import SagemcomClient
+from sagemcom_api.const import DEFAULT_USER_AGENT
 from sagemcom_api.enums import EncryptionMethod
 from sagemcom_api.exceptions import (
     AccessRestrictionException,
@@ -21,7 +22,12 @@ from sagemcom_api.exceptions import (
     UnauthorizedException,
 )
 
-from .const import SPEED_TEST_POLL_SECONDS, SPEED_TEST_TIMEOUT
+from .const import (
+    REQUEST_TIMEOUT,
+    SPEED_TEST_POLL_SECONDS,
+    SPEED_TEST_START_TIMEOUT,
+    SPEED_TEST_TIMEOUT,
+)
 from .parse import (
     FastSnapshot,
     SlowSnapshot,
@@ -79,7 +85,15 @@ class GigaHubApi:
     """
 
     def __init__(self, host: str, username: str, password: str) -> None:
-        self._client = SagemcomClient(host, username, password, EncryptionMethod.SHA512)
+        # The 5690 uses the legacy JSON API, which needs the default (safe) cookie jar.
+        self._session = ClientSession(
+            headers={"User-Agent": DEFAULT_USER_AGENT},
+            timeout=ClientTimeout(total=REQUEST_TIMEOUT),
+            cookie_jar=CookieJar(unsafe=False),
+        )
+        self._client = SagemcomClient(
+            host, username, password, EncryptionMethod.SHA512, session=self._session
+        )
         self._lock = asyncio.Lock()
         self._logged_in = False
         self.identity: HubIdentity | None = None
@@ -91,6 +105,8 @@ class GigaHubApi:
                     await self._client.logout()
                 self._logged_in = False
             await self._client.close()
+            if not self._session.closed:
+                await self._session.close()
 
     async def _call(self, coro_factory):
         async with self._lock:
@@ -162,7 +178,12 @@ class GigaHubApi:
         }
         for uid in access_points:
             xpaths[f"ap_{uid}"] = f"Device/WiFi/AccessPoints/AccessPoint[@uid='{uid}']/AssociatedDevices"
-        raw = await self._call(lambda: self._client.get_values_by_xpaths(xpaths, ignore_unknown_paths=True))
+        # Two requests instead of one: the device list on its own (~6 s, ~370 KB), then
+        # everything else (~3 s). Each stays well inside the timeout, and the fast poll
+        # gets the session in between instead of waiting for the whole lot.
+        hosts = xpaths.pop("hosts")
+        raw = await self._call(lambda: self._client.get_values_by_xpaths({"hosts": hosts}))
+        raw |= await self._call(lambda: self._client.get_values_by_xpaths(xpaths, ignore_unknown_paths=True))
         return parse_slow(raw, access_points)
 
     async def raw(self, xpaths: dict[str, str]) -> dict[str, Any]:
@@ -174,10 +195,15 @@ class GigaHubApi:
         before, _ = parse_speed_test((await self.raw({"st": "Device/IP/Diagnostics/SpeedTest"})).get("st"))
         previous = before.timestamp if before else 0
         try:
-            await self._call(lambda: self._client.run_speed_test(block_traffic=block_traffic))
+            await self._call(
+                lambda: asyncio.wait_for(
+                    self._client.run_speed_test(block_traffic=block_traffic),
+                    SPEED_TEST_START_TIMEOUT,
+                )
+            )
         except GigaHubConnectionError as err:
-            # The hub holds the start request open while the test runs, so it usually
-            # outlasts the library's 15 s timeout. The test is running; keep watching.
+            # The hub holds the start request open while the test runs; cutting it off
+            # doesn't stop the test. Keep watching for the result.
             if not isinstance(err.__cause__, TimeoutError):
                 raise
         deadline = time.monotonic() + SPEED_TEST_TIMEOUT.total_seconds()

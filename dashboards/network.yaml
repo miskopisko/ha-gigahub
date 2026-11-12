@@ -114,7 +114,7 @@ sections:
         icon: mdi:chart-bar
       - type: statistics-graph
         title: Daily (last 30 days)
-        chart_type: bar
+        chart_type: line
         period: day
         days_to_show: 30
         stat_types: [change]
@@ -127,7 +127,7 @@ sections:
           columns: full
       - type: statistics-graph
         title: Monthly
-        chart_type: bar
+        chart_type: line
         period: month
         days_to_show: 365
         stat_types: [change]
@@ -271,6 +271,28 @@ sections:
             name: 5 GHz
           - entity: sensor.giga_hub_6_ghz_download
             name: 6 GHz
+        grid_options:
+          columns: full
+      - type: tile
+        entity: sensor.giga_hub_busiest_wi_fi_device
+        name: Busiest Wi-Fi device
+        grid_options:
+          columns: full
+      - type: markdown
+        title: Wi-Fi devices by traffic
+        content: |
+          {% set rows = state_attr('sensor.giga_hub_busiest_wi_fi_device', 'devices') or [] -%}
+          {% if rows -%}
+          | Device | ↓ Mbps | ↑ Mbps | Used since connecting |
+          |:--|--:|--:|--:|
+          {% for r in rows -%}
+          | {{ r.name }} | {{ '%.1f' % r.download_mbps if r.download_mbps is not none else '…' }} | {{ '%.1f' % r.upload_mbps if r.upload_mbps is not none else '…' }} | {{ r.downloaded_gb }} GB ↓ / {{ r.uploaded_gb }} GB ↑ |
+          {% endfor %}
+
+          <sub>5-minute averages. Devices on the pod aren't included; the hub can't see their traffic.</sub>
+          {%- else -%}
+          Waiting for the first readings…
+          {%- endif %}
         grid_options:
           columns: full
       - type: markdown

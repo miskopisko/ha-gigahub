@@ -30,6 +30,7 @@ from homeassistant.helpers.typing import StateType
 from homeassistant.util import dt as dt_util
 
 from . import GigaHubConfigEntry
+from .clients import client_entities
 from .const import BANDS
 from .coordinator import FastData, GigaHubFastCoordinator, GigaHubSlowCoordinator
 from .entity import GigaHubEntity
@@ -522,4 +523,5 @@ async def async_setup_entry(
         )
         entities.append(cls(fast, entry, description))
     entities.extend(GigaHubSlowSensor(slow, entry, d) for d in slow_descriptions)
+    entities.extend(client_entities(hass, entry))
     async_add_entities(entities)
