@@ -284,3 +284,16 @@ def test_discovery() -> None:
     ip_interfaces = [{"uid": 1, "alias": "IP_BR_LAN"}, {"uid": 2, "alias": "IP_DATA"}]
     assert parse.find_ip_interface_uid(ip_interfaces) == 2
     assert parse.find_access_points(FAST_RAW["ssids"]) == {1: "2g4", 3: "5g", 4: "5g"}
+
+
+def test_speed_test_status_field_used_by_5690() -> None:
+    raw = {
+        "speed_test": {
+            **SPEED_TEST["speed_test"],
+            "diagnostics_state": "NONE",
+            "diagnostics_status": "COMPLETE",
+        }
+    }
+    result, state = parse.parse_speed_test(raw)
+    assert state == "COMPLETE"
+    assert result.jitter_ms == 1.5

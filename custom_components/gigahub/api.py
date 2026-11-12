@@ -173,7 +173,13 @@ class GigaHubApi:
         """Start the hub's built-in speed test and wait until a new result lands."""
         before, _ = parse_speed_test((await self.raw({"st": "Device/IP/Diagnostics/SpeedTest"})).get("st"))
         previous = before.timestamp if before else 0
-        await self._call(lambda: self._client.run_speed_test(block_traffic=block_traffic))
+        try:
+            await self._call(lambda: self._client.run_speed_test(block_traffic=block_traffic))
+        except GigaHubConnectionError as err:
+            # The hub holds the start request open while the test runs, so it usually
+            # outlasts the library's 15 s timeout. The test is running; keep watching.
+            if not isinstance(err.__cause__, TimeoutError):
+                raise
         deadline = time.monotonic() + SPEED_TEST_TIMEOUT.total_seconds()
         while time.monotonic() < deadline:
             await asyncio.sleep(SPEED_TEST_POLL_SECONDS)

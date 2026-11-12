@@ -412,7 +412,9 @@ def parse_speed_test(raw: Any) -> tuple[SpeedTestResult | None, str | None]:
     node = _unwrap(raw, "speed_test")
     if not isinstance(node, dict):
         return None, None
-    state = node.get("diagnostics_state")
+    # The 5690 reports progress in DiagnosticsStatus (REQUESTED -> COMPLETE) and
+    # leaves DiagnosticsState at NONE; other firmware may use the standard field.
+    state = node.get("diagnostics_status") or node.get("diagnostics_state")
     history = node.get("history") or {}
     stamps = str(history.get("timestamp") or "")
     if not stamps:
