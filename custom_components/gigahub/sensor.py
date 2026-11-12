@@ -30,7 +30,7 @@ from homeassistant.helpers.typing import StateType
 from homeassistant.util import dt as dt_util
 
 from . import GigaHubConfigEntry
-from .clients import client_entities
+from .clients import client_entities, wired_rows
 from .const import BANDS
 from .coordinator import FastData, GigaHubFastCoordinator, GigaHubSlowCoordinator
 from .entity import GigaHubEntity
@@ -261,7 +261,8 @@ DEVICES: tuple[SlowSensorDescription, ...] = (
         state_class=SensorStateClass.MEASUREMENT,
         value_fn=lambda s: sum(1 for h in s.active_hosts if h.interface_type == "Ethernet"),
         attrs_fn=lambda s: {
-            "devices": _names(s, [h for h in s.active_hosts if h.interface_type == "Ethernet"])
+            "devices": _names(s, [h for h in s.active_hosts if h.interface_type == "Ethernet"]),
+            "details": wired_rows(s),
         },
     ),
     SlowSensorDescription(

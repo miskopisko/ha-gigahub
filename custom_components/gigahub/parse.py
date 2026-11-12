@@ -55,6 +55,15 @@ def _band_from_ref(ref: str | None) -> str | None:
     return None
 
 
+_PORT_REF_RE = re.compile(r"Interface\[PHY(\d+)\]")
+
+
+def _port_from_ref(ref: str | None) -> int | None:
+    """``Device/Ethernet/Interfaces/Interface[PHY2]`` -> ``2``."""
+    match = _PORT_REF_RE.search(ref or "")
+    return int(match.group(1)) if match else None
+
+
 def normalize_mac(mac: str | None) -> str:
     return (mac or "").strip().lower()
 
@@ -399,6 +408,7 @@ class Host:
     active: bool
     interface_type: str | None
     band: str | None
+    port: int | None = None  # LAN port number, for wired devices
     hub_name: str | None = None  # a real name from the hub, never a bare MAC
     vendor_class: str | None = None  # DHCP option 60, e.g. "android-dhcp-14"
     vendor: str | None = None  # manufacturer from the MAC's OUI, filled in by assign_names
@@ -519,6 +529,9 @@ class SlowSnapshot:
     speed_test_state: str | None
     firmware: str | None
     reboot_count: int | None
+    # LAN ports again (the fast poll has them too), so wired-device rows get port
+    # totals on the same schedule as the device list.
+    ports: list[PortStatus] = field(default_factory=list)
     names: dict[str, str] = field(default_factory=dict)
     vendors: dict[str, str] = field(default_factory=dict)
     namer: Callable[[str], str] | None = None
@@ -528,6 +541,9 @@ class SlowSnapshot:
     @property
     def active_hosts(self) -> list[Host]:
         return [h for h in self.hosts if h.active]
+
+    def host(self, mac: str) -> Host | None:
+        return next((h for h in self.hosts if h.mac == mac), None)
 
     def clients_on(self, band: str) -> list[WifiClient]:
         return [c for c in self.wifi_clients if c.band == band]
@@ -567,6 +583,7 @@ def parse_hosts(raw: Any) -> list[Host]:
                 active=bool(host.get("active")),
                 interface_type=host.get("interface_type") or None,
                 band=_band_from_ref(host.get("layer1_interface")),
+                port=_port_from_ref(host.get("layer1_interface")),
                 hub_name=hub_name,
                 vendor_class=host.get("vendor_class_id") or None,
                 private=is_private_mac(mac),
@@ -717,6 +734,7 @@ def parse_slow(raw: dict[str, Any], access_points: dict[int, str]) -> SlowSnapsh
         speed_test_state=state,
         firmware=raw.get("firmware") if isinstance(raw.get("firmware"), str) else None,
         reboot_count=_int(raw.get("reboot_count")),
+        ports=parse_ports(raw.get("ports")),
         names={h.mac: h.name for h in hosts},
     )
 

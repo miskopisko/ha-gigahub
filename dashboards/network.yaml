@@ -295,21 +295,21 @@ sections:
           <p>{{ ns.ch | join(' · ') }}</p>
           {%- if rows -%}
           <table width="100%">
-          <tr><th align="left">Device</th><th>Band</th><th align="right">Signal</th><th>Wi-Fi</th><th align="right">Link ↓ / ↑</th><th align="right">Now ↓ / ↑</th><th align="right">Since connecting ↓ / ↑</th></tr>
+          <tr><th align="left">Device</th><th align="left">IP</th><th>Band</th><th align="right">Signal</th><th>Wi-Fi</th><th align="right">Link ↓ / ↑</th><th align="right">Since connecting ↓ / ↑</th></tr>
           {%- for r in rows -%}
           {%- set s = r.signal_dbm -%}
           <tr>
           <td>{{ r.name }}</td>
+          <td>{{ r.ip or '' }}</td>
           <td align="center">{{ r.band }}</td>
           <td align="right">{{ s }} dBm {{ '🟢' if s is not none and s >= -60 else ('🟡' if s is not none and s >= -70 else '🔴') }}</td>
           <td align="center">{{ 'Wi-Fi 6E' if r.band == '6 GHz' and r.standard == 'ax' else gen.get(r.standard, r.standard or '') }}</td>
           <td align="right">{{ r.link_down_mbps }} / {{ r.link_up_mbps }} Mbps</td>
-          <td align="right">{{ ('%.1f' % r.download_mbps) if r.download_mbps is not none else '…' }} / {{ ('%.1f' % r.upload_mbps) if r.upload_mbps is not none else '…' }} Mbps</td>
           <td align="right">{{ '%.1f' % r.downloaded_gb if r.downloaded_gb is not none else '' }} / {{ '%.2f' % r.uploaded_gb if r.uploaded_gb is not none else '' }} GB</td>
           </tr>
           {%- endfor -%}
           </table>
-          <p><sub>Busiest first. "Now" is a 5-minute average. Devices on the pod aren't listed; the hub can't see them.</sub></p>
+          <p><sub>Busiest first (last 5 minutes). Devices on the pod aren't listed; the hub can't see them.</sub></p>
           {%- else -%}
           <p>Waiting for the first readings…</p>
           {%- endif -%}
@@ -341,6 +341,30 @@ sections:
             name: Wi-Fi
           - entity: sensor.giga_hub_wired_devices
             name: Wired
+        grid_options:
+          columns: full
+      - type: markdown
+        title: Wired devices
+        content: >-
+          {%- set rows = state_attr('sensor.giga_hub_wired_devices', 'details') or [] -%}
+          {%- if rows -%}
+          <table width="100%">
+          <tr><th align="left">Device</th><th align="left">IP</th><th>Port</th><th align="right">Link</th><th align="right">Port total ↓ / ↑</th></tr>
+          {%- for r in rows -%}
+          {%- set l = r.link_mbps -%}
+          <tr>
+          <td>{{ r.name }}</td>
+          <td>{{ r.ip or '' }}</td>
+          <td align="center">{{ r.port or '' }}</td>
+          <td align="right">{{ '' if l is none else (('%g Gbps' % (l / 1000)) if l >= 1000 else (l ~ ' Mbps')) }}</td>
+          <td align="right">{{ '%.1f' % r.port_downloaded_gb if r.port_downloaded_gb is not none else '' }} / {{ '%.1f' % r.port_uploaded_gb if r.port_uploaded_gb is not none else '' }} GB</td>
+          </tr>
+          {%- endfor -%}
+          </table>
+          <p><sub>Traffic is per LAN port, so devices behind a switch share their port's totals.</sub></p>
+          {%- else -%}
+          <p>No wired devices right now.</p>
+          {%- endif -%}
         grid_options:
           columns: full
       - type: markdown

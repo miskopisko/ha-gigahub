@@ -245,12 +245,16 @@ def test_slow_snapshot() -> None:
             "speed_test": SPEED_TEST,
             "firmware": "2.14.2",
             "reboot_count": 29,
+            "ports": FAST_RAW["ports"],
         },
         {4: "5g"},
     )
     assert [h.name for h in snap.hosts] == ["Laptop", "nas", "AA:AA:AA:00:00:03"]
     assert len(snap.active_hosts) == 2
     assert snap.hosts[0].band == "5g"
+    assert [h.port for h in snap.hosts] == [None, 1, None]
+    assert snap.host("aa:aa:aa:00:00:02").ip == "192.168.2.11"
+    assert [p.number for p in snap.ports] == [1, 3]
 
     clients = snap.clients_on("5g")
     assert len(clients) == 1  # inactive history entries are dropped

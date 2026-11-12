@@ -175,6 +175,7 @@ class GigaHubApi:
             "speed_test": "Device/IP/Diagnostics/SpeedTest",
             "firmware": "Device/DeviceInfo/SoftwareVersion",
             "reboot_count": "Device/DeviceInfo/RebootCount",
+            "ports": "Device/Ethernet/Interfaces",
         }
         for uid in access_points:
             xpaths[f"ap_{uid}"] = f"Device/WiFi/AccessPoints/AccessPoint[@uid='{uid}']/AssociatedDevices"

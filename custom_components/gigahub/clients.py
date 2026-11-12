@@ -1,4 +1,4 @@
-"""Per-device Wi-Fi traffic: a "busiest device" overview and sensors for named devices."""
+"""Per-device traffic: Wi-Fi and wired device tables, and sensors for named Wi-Fi devices."""
 
 from __future__ import annotations
 
@@ -37,10 +37,12 @@ def traffic_rows(s: SlowSnapshot) -> list[dict[str, Any]]:
     rows = []
     for client in s.wifi_clients:
         traffic = s.device_traffic.get(client.mac)
+        host = s.host(client.mac)
         rows.append(
             {
                 "name": s.name_for(client.mac),
                 "mac": client.mac.upper(),
+                "ip": host.ip if host else None,
                 "band": BAND_LABEL.get(client.band, client.band),
                 "signal_dbm": client.signal_dbm,
                 "standard": client.standard,
@@ -54,6 +56,36 @@ def traffic_rows(s: SlowSnapshot) -> list[dict[str, Any]]:
             }
         )
     rows.sort(key=lambda r: (r["download_mbps"] or 0) + (r["upload_mbps"] or 0), reverse=True)
+    return rows
+
+
+def _gb(value: int | None) -> float | None:
+    return round(value / 1e9, 2) if value is not None else None
+
+
+def wired_rows(s: SlowSnapshot) -> list[dict[str, Any]]:
+    """Every wired device, by LAN port. The hub only counts traffic per port, so
+    devices behind a switch share their port's numbers."""
+    ports = {p.number: p for p in s.ports}
+    rows = []
+    for host in s.active_hosts:
+        if host.interface_type != "Ethernet":
+            continue
+        port = ports.get(host.port) if host.port is not None else None
+        rows.append(
+            {
+                "name": host.name,
+                "mac": host.mac.upper(),
+                "ip": host.ip,
+                "vendor": host.vendor,
+                "port": host.port,
+                "link_mbps": port.speed_mbps if port else None,
+                # Port counters are from the hub's side: sent = to the device.
+                "port_downloaded_gb": _gb(port.bytes_sent) if port else None,
+                "port_uploaded_gb": _gb(port.bytes_received) if port else None,
+            }
+        )
+    rows.sort(key=lambda r: (r["port"] is None, r["port"] or 0, r["name"].lower()))
     return rows
 
 

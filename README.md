@@ -38,15 +38,17 @@ what the hub's own speed test says your line can do, and how well every Wi-Fi cl
 
 **Per-device Wi-Fi traffic**
 - *Busiest Wi-Fi device*: the device using the most right now; its attributes list every Wi-Fi
-  device on the hub's radios with download/upload speed (5-minute averages), data used since it
-  connected, band and signal
+  device on the hub's radios with IP address, download/upload speed (5-minute averages), data used
+  since it connected, band and signal
 - For every Wi-Fi device you name (see Options): its own device in Home Assistant with download and
   upload speed, data downloaded / uploaded (running totals that survive reconnects and restarts, so
   they get daily and monthly statistics) and Wi-Fi signal
 - Devices connected through a Bell Wi-Fi pod aren't included: the hub doesn't count their traffic
 
 **Devices and hub**
-- Devices connected, wired, Wi-Fi (names as attributes)
+- Devices connected, wired, Wi-Fi (names as attributes). *Wired devices* also lists each wired
+  device's IP address, LAN port, port link speed and port traffic totals. Wired traffic is
+  counted per port, so devices behind a switch share their port's numbers
 - Friendly device names: when the hub only knows a MAC address, the device is named after its
   manufacturer (from the MAC prefix), e.g. *Nintendo (12:34:56)*, or *Android device* / *Private
   address* when that's all there is to go on. You can name any device yourself (see Options).
