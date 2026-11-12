@@ -238,6 +238,8 @@ sections:
         name: Module temperature
 
   - type: grid
+    # Two columns wide so the device tables have room.
+    column_span: 2
     cards:
       - type: heading
         heading: Wi-Fi
@@ -283,13 +285,13 @@ sections:
         content: |
           {% set rows = state_attr('sensor.giga_hub_busiest_wi_fi_device', 'devices') or [] -%}
           {% if rows -%}
-          | Device | ↓ Mbps | ↑ Mbps | Used since connecting |
-          |:--|--:|--:|--:|
+          | Device | Band | Signal | Now ↓ | Now ↑ | Since connecting ↓ | Since connecting ↑ |
+          |:--|:-:|--:|--:|--:|--:|--:|
           {% for r in rows -%}
-          | {{ r.name }} | {{ '%.1f' % r.download_mbps if r.download_mbps is not none else '…' }} | {{ '%.1f' % r.upload_mbps if r.upload_mbps is not none else '…' }} | {{ r.downloaded_gb }} GB ↓ / {{ r.uploaded_gb }} GB ↑ |
+          | {{ r.name }} | {{ r.band }} | {{ r.signal_dbm }} dBm | {{ '%.1f Mbps' % r.download_mbps if r.download_mbps is not none else '…' }} | {{ '%.1f Mbps' % r.upload_mbps if r.upload_mbps is not none else '…' }} | {{ '%.1f GB' % r.downloaded_gb if r.downloaded_gb is not none else '' }} | {{ '%.2f GB' % r.uploaded_gb if r.uploaded_gb is not none else '' }} |
           {% endfor %}
 
-          <sub>5-minute averages. Devices on the pod aren't included; the hub can't see their traffic.</sub>
+          <sub>"Now" is a 5-minute average. Devices on the pod aren't included; the hub can't see their traffic.</sub>
           {%- else -%}
           Waiting for the first readings…
           {%- endif %}
@@ -303,10 +305,10 @@ sections:
           {% if clients -%}
           **{{ band | replace('_', '.') }} GHz** · channel {{ states('sensor.giga_hub_' ~ band ~ '_ghz_channel') }} ({{ state_attr('sensor.giga_hub_' ~ band ~ '_ghz_channel', 'bandwidth') }})
 
-          | Device | Signal | Link ↓ / ↑ |
-          |:--|--:|--:|
+          | Device | Signal | Wi-Fi | Link ↓ | Link ↑ |
+          |:--|--:|:-:|--:|--:|
           {% for name, c in clients.items() -%}
-          | {{ name }} | {{ c.signal_dbm }} dBm {{ '🟢' if c.signal_dbm >= -60 else ('🟡' if c.signal_dbm >= -70 else '🔴') }} | {{ c.link_down_mbps }} / {{ c.link_up_mbps }} Mbps |
+          | {{ name }} | {{ c.signal_dbm }} dBm {{ '🟢' if c.signal_dbm >= -60 else ('🟡' if c.signal_dbm >= -70 else '🔴') }} | {{ 'Wi-Fi 6E' if band == '6' and c.standard == 'ax' else {'ax': 'Wi-Fi 6', 'ac': 'Wi-Fi 5', 'n': 'Wi-Fi 4', 'g': 'Wi-Fi 3', 'a': 'Wi-Fi 2', 'b': 'Wi-Fi 1'}.get(c.standard, c.standard or '') }} | {{ c.link_down_mbps }} Mbps | {{ c.link_up_mbps }} Mbps |
           {% endfor %}
 
           {% endif -%}
