@@ -150,6 +150,9 @@
       },
       "client_signal": {
         "default": "mdi:wifi"
+      },
+      "newest_device": {
+        "default": "mdi:new-box"
       }
     },
     "select": {

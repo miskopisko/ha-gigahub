@@ -12,6 +12,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
+from homeassistant.util import dt as dt_util
 
 from .api import GigaHubApi, GigaHubAuthError, GigaHubConnectionError
 from .const import CONF_DEVICE_NAMES, DOMAIN
@@ -35,6 +36,7 @@ LEDGER_SAVE_DELAY = 60  # seconds; the ledger changes every poll, so debounce wr
 # every 10 s; the internet (PPP) counter lands in irregular batches 15-25 s late.
 FIBRE_WINDOW = 20
 INTERNET_WINDOW = 60
+RECENT_NEW_DEVICES = 25
 
 
 @dataclass(slots=True)
@@ -125,9 +127,7 @@ class GigaHubSlowCoordinator(DataUpdateCoordinator[SlowSnapshot]):
             update_interval=timedelta(seconds=interval),
         )
         self.api = api
-        self._store: Store[dict[str, list[str]]] = Store(
-            hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}.known_devices"
-        )
+        self._store: Store[dict] = Store(hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}.known_devices")
         self._known: set[str] | None = None
         self._vendor_lookup = None
         self._traffic_store: Store[dict] = Store(
@@ -137,6 +137,7 @@ class GigaHubSlowCoordinator(DataUpdateCoordinator[SlowSnapshot]):
         # Drained by the event entity. A queue, because the first refresh runs
         # before the entity exists and its findings must not be lost.
         self.pending_new_devices: list[Host] = []
+        self.recent_new_devices: list[dict] = []
 
     async def _async_update_data(self) -> SlowSnapshot:
         try:
@@ -164,20 +165,38 @@ class GigaHubSlowCoordinator(DataUpdateCoordinator[SlowSnapshot]):
         """Remember every MAC ever seen; anything not in that set is new.
 
         The first run seeds the set from the hub's own device history, so installing
-        the integration doesn't announce every device in the house.
+        the integration doesn't announce every device in the house. The most recent
+        arrivals are kept too, for the "Newest device" sensor and its list.
         """
         if self._known is None:
-            stored = await self._store.async_load()
-            self._known = set(stored["macs"]) if stored else set()
+            stored = await self._store.async_load() or {}
+            self._known = set(stored.get("macs") or [])
+            self.recent_new_devices = list(stored.get("recent") or [])
             if not stored:
                 self._known.update(h.mac for h in snapshot.hosts)
-                await self._store.async_save({"macs": sorted(self._known)})
+                await self._save_known()
                 return
         new = [h for h in snapshot.hosts if h.mac not in self._known]
         if new:
             self.pending_new_devices.extend(new)
             self._known.update(h.mac for h in new)
-            await self._store.async_save({"macs": sorted(self._known)})
+            joined = dt_util.utcnow().isoformat(timespec="seconds")
+            arrivals = [
+                {
+                    "time": joined,
+                    "name": h.name,
+                    "mac": h.mac.upper(),
+                    "vendor": h.vendor,
+                    "connection": (h.interface_type or "").replace("WiFi", "Wi-Fi") or None,
+                    "ip": h.ip,
+                }
+                for h in new
+            ]
+            self.recent_new_devices = (arrivals + self.recent_new_devices)[:RECENT_NEW_DEVICES]
+            await self._save_known()
+
+    async def _save_known(self) -> None:
+        await self._store.async_save({"macs": sorted(self._known or ()), "recent": self.recent_new_devices})
 
 
 async def _load_vendor_lookup():

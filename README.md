@@ -50,7 +50,8 @@ what the hub's own speed test says your line can do, and how well every Wi-Fi cl
 - Friendly device names: when the hub only knows a MAC address, the device is named after its
   manufacturer (from the MAC prefix), e.g. *Nintendo (12:34:56)*, or *Android device* / *Private
   address* when that's all there is to go on. You can name any device yourself (see Options).
-- A *New device* event entity that fires when a device the hub has never seen joins
+- A *New device* event entity that fires when a device the hub has never seen joins, and a
+  *Newest device* sensor that keeps the last 25 arrivals (time, name, maker, connection, IP)
 - LAN port link speed and traffic per port (unused ports are added disabled)
 - Last boot, memory use, firmware, reboot count, and a restart button
 

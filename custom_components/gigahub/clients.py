@@ -43,6 +43,9 @@ def traffic_rows(s: SlowSnapshot) -> list[dict[str, Any]]:
                 "mac": client.mac.upper(),
                 "band": BAND_LABEL.get(client.band, client.band),
                 "signal_dbm": client.signal_dbm,
+                "standard": client.standard,
+                "link_down_mbps": client.downlink_mbps,
+                "link_up_mbps": client.uplink_mbps,
                 "download_mbps": traffic.download_mbps if traffic else None,
                 "upload_mbps": traffic.upload_mbps if traffic else None,
                 "downloaded_gb": round(client.bytes_down / 1e9, 2) if client.bytes_down is not None else None,
@@ -78,6 +81,31 @@ class GigaHubBusiestDevice(CoordinatorEntity[GigaHubSlowCoordinator], SensorEnti
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
         return {"devices": traffic_rows(self.coordinator.data)}
+
+
+class GigaHubNewestDevice(CoordinatorEntity[GigaHubSlowCoordinator], SensorEntity):
+    """State: the most recent device the hub had never seen before.
+
+    Attributes keep the last 25 arrivals (time, name, maker, connection, IP). Unlike the
+    event entity's logbook, restarts don't add "unavailable" noise to this list.
+    """
+
+    _attr_has_entity_name = True
+    _attr_translation_key = "newest_device"
+
+    def __init__(self, coordinator: GigaHubSlowCoordinator, entry: GigaHubConfigEntry) -> None:
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{format_mac(entry.runtime_data.identity.mac)}_newest_device"
+        self._attr_device_info = hub_device_info(entry)
+
+    @property
+    def native_value(self) -> str | None:
+        recent = self.coordinator.recent_new_devices
+        return recent[0]["name"] if recent else None
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        return {"recent": self.coordinator.recent_new_devices}
 
 
 # --------------------------------------------------------------------------- named devices
@@ -188,7 +216,7 @@ def client_entities(hass: HomeAssistant, entry: GigaHubConfigEntry) -> list[Sens
     slow = entry.runtime_data.slow
     named = named_wifi_devices(entry)
     remove_stale_client_devices(hass, entry, set(named))
-    entities: list[SensorEntity] = [GigaHubBusiestDevice(slow, entry)]
+    entities: list[SensorEntity] = [GigaHubBusiestDevice(slow, entry), GigaHubNewestDevice(slow, entry)]
     # Link each device to the hub's registry entry (creating it if this runs first).
     hub_device = dr.async_get(hass).async_get_or_create(
         config_entry_id=entry.entry_id, **hub_device_info(entry)

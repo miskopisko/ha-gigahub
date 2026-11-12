@@ -281,38 +281,38 @@ sections:
         grid_options:
           columns: full
       - type: markdown
-        title: Wi-Fi devices by traffic
-        content: |
-          {% set rows = state_attr('sensor.giga_hub_busiest_wi_fi_device', 'devices') or [] -%}
-          {% if rows -%}
-          | Device | Band | Signal | Now ↓ | Now ↑ | Since connecting ↓ | Since connecting ↑ |
-          |:--|:-:|--:|--:|--:|--:|--:|
-          {% for r in rows -%}
-          | {{ r.name }} | {{ r.band }} | {{ r.signal_dbm }} dBm | {{ '%.1f Mbps' % r.download_mbps if r.download_mbps is not none else '…' }} | {{ '%.1f Mbps' % r.upload_mbps if r.upload_mbps is not none else '…' }} | {{ '%.1f GB' % r.downloaded_gb if r.downloaded_gb is not none else '' }} | {{ '%.2f GB' % r.uploaded_gb if r.uploaded_gb is not none else '' }} |
-          {% endfor %}
-
-          <sub>"Now" is a 5-minute average. Devices on the pod aren't included; the hub can't see their traffic.</sub>
+        title: Wi-Fi devices
+        content: >-
+          {%- set rows = state_attr('sensor.giga_hub_busiest_wi_fi_device', 'devices') or [] -%}
+          {%- set gen = {'ax': 'Wi-Fi 6', 'ac': 'Wi-Fi 5', 'n': 'Wi-Fi 4', 'g': 'Wi-Fi 3', 'a': 'Wi-Fi 2', 'b': 'Wi-Fi 1'} -%}
+          {%- set ns = namespace(ch=[]) -%}
+          {%- for b in ['2_4', '5', '6'] -%}
+          {%- set c = states('sensor.giga_hub_' ~ b ~ '_ghz_channel') -%}
+          {%- if c not in ['unknown', 'unavailable'] -%}
+          {%- set ns.ch = ns.ch + [b | replace('_', '.') ~ ' GHz: channel ' ~ c ~ ' (' ~ state_attr('sensor.giga_hub_' ~ b ~ '_ghz_channel', 'bandwidth') ~ ')'] -%}
+          {%- endif -%}
+          {%- endfor -%}
+          <p>{{ ns.ch | join(' · ') }}</p>
+          {%- if rows -%}
+          <table width="100%">
+          <tr><th align="left">Device</th><th>Band</th><th align="right">Signal</th><th>Wi-Fi</th><th align="right">Link ↓ / ↑</th><th align="right">Now ↓ / ↑</th><th align="right">Since connecting ↓ / ↑</th></tr>
+          {%- for r in rows -%}
+          {%- set s = r.signal_dbm -%}
+          <tr>
+          <td>{{ r.name }}</td>
+          <td align="center">{{ r.band }}</td>
+          <td align="right">{{ s }} dBm {{ '🟢' if s is not none and s >= -60 else ('🟡' if s is not none and s >= -70 else '🔴') }}</td>
+          <td align="center">{{ 'Wi-Fi 6E' if r.band == '6 GHz' and r.standard == 'ax' else gen.get(r.standard, r.standard or '') }}</td>
+          <td align="right">{{ r.link_down_mbps }} / {{ r.link_up_mbps }} Mbps</td>
+          <td align="right">{{ ('%.1f' % r.download_mbps) if r.download_mbps is not none else '…' }} / {{ ('%.1f' % r.upload_mbps) if r.upload_mbps is not none else '…' }} Mbps</td>
+          <td align="right">{{ '%.1f' % r.downloaded_gb if r.downloaded_gb is not none else '' }} / {{ '%.2f' % r.uploaded_gb if r.uploaded_gb is not none else '' }} GB</td>
+          </tr>
+          {%- endfor -%}
+          </table>
+          <p><sub>Busiest first. "Now" is a 5-minute average. Devices on the pod aren't listed; the hub can't see them.</sub></p>
           {%- else -%}
-          Waiting for the first readings…
-          {%- endif %}
-        grid_options:
-          columns: full
-      - type: markdown
-        title: Clients on the hub's radios
-        content: |
-          {% for band in ['2_4', '5', '6'] -%}
-          {% set clients = state_attr('sensor.giga_hub_' ~ band ~ '_ghz_clients', 'clients') or {} -%}
-          {% if clients -%}
-          **{{ band | replace('_', '.') }} GHz** · channel {{ states('sensor.giga_hub_' ~ band ~ '_ghz_channel') }} ({{ state_attr('sensor.giga_hub_' ~ band ~ '_ghz_channel', 'bandwidth') }})
-
-          | Device | Signal | Wi-Fi | Link ↓ | Link ↑ |
-          |:--|--:|:-:|--:|--:|
-          {% for name, c in clients.items() -%}
-          | {{ name }} | {{ c.signal_dbm }} dBm {{ '🟢' if c.signal_dbm >= -60 else ('🟡' if c.signal_dbm >= -70 else '🔴') }} | {{ 'Wi-Fi 6E' if band == '6' and c.standard == 'ax' else {'ax': 'Wi-Fi 6', 'ac': 'Wi-Fi 5', 'n': 'Wi-Fi 4', 'g': 'Wi-Fi 3', 'a': 'Wi-Fi 2', 'b': 'Wi-Fi 1'}.get(c.standard, c.standard or '') }} | {{ c.link_down_mbps }} Mbps | {{ c.link_up_mbps }} Mbps |
-          {% endfor %}
-
-          {% endif -%}
-          {% endfor %}
+          <p>Waiting for the first readings…</p>
+          {%- endif -%}
         grid_options:
           columns: full
 
@@ -343,11 +343,20 @@ sections:
             name: Wired
         grid_options:
           columns: full
-      - type: logbook
+      - type: markdown
         title: New devices
-        target:
-          entity_id: event.giga_hub_new_device
-        hours_to_show: 720
+        content: >-
+          {%- set recent = state_attr('sensor.giga_hub_newest_device', 'recent') or [] -%}
+          {%- if recent -%}
+          <table width="100%">
+          <tr><th align="left">When</th><th align="left">Device</th><th align="left">Maker</th><th>Via</th></tr>
+          {%- for d in recent[:10] -%}
+          <tr><td>{{ as_timestamp(d.time) | timestamp_custom('%b %-d, %-I:%M %p') }}</td><td>{{ d.name }}</td><td>{{ d.vendor or '' }}</td><td align="center">{{ d.connection or '' }}</td></tr>
+          {%- endfor -%}
+          </table>
+          {%- else -%}
+          <p>No new devices yet. Anything the hub has never seen before will show up here.</p>
+          {%- endif -%}
         grid_options:
           columns: full
 

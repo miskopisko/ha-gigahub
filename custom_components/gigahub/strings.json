@@ -229,6 +229,9 @@
       },
       "client_signal": {
         "name": "Wi-Fi signal"
+      },
+      "newest_device": {
+        "name": "Newest device"
       }
     },
     "select": {
