@@ -1,0 +1,126 @@
+{
+  "entity": {
+    "binary_sensor": {
+      "internet": {
+        "default": "mdi:web",
+        "state": {
+          "off": "mdi:web-off"
+        }
+      },
+      "fibre_problem": {
+        "default": "mdi:check-circle-outline",
+        "state": {
+          "on": "mdi:alert-circle"
+        }
+      }
+    },
+    "button": {
+      "run_speed_test": {
+        "default": "mdi:speedometer"
+      }
+    },
+    "event": {
+      "new_device": {
+        "default": "mdi:devices"
+      }
+    },
+    "sensor": {
+      "download_speed": {
+        "default": "mdi:download-network"
+      },
+      "upload_speed": {
+        "default": "mdi:upload-network"
+      },
+      "data_downloaded": {
+        "default": "mdi:download"
+      },
+      "data_uploaded": {
+        "default": "mdi:upload"
+      },
+      "internet_status": {
+        "default": "mdi:web"
+      },
+      "connected_since": {
+        "default": "mdi:clock-check-outline"
+      },
+      "public_ip": {
+        "default": "mdi:ip-network"
+      },
+      "fibre_rx_power": {
+        "default": "mdi:led-on"
+      },
+      "fibre_tx_power": {
+        "default": "mdi:led-outline"
+      },
+      "fibre_errors": {
+        "default": "mdi:alert-octagon-outline"
+      },
+      "fibre_alarm": {
+        "default": "mdi:alarm-light-outline"
+      },
+      "last_boot": {
+        "default": "mdi:restart"
+      },
+      "memory_used": {
+        "default": "mdi:memory"
+      },
+      "firmware": {
+        "default": "mdi:chip"
+      },
+      "reboot_count": {
+        "default": "mdi:counter"
+      },
+      "devices_connected": {
+        "default": "mdi:devices"
+      },
+      "wired_devices": {
+        "default": "mdi:ethernet"
+      },
+      "wifi_devices": {
+        "default": "mdi:wifi"
+      },
+      "wifi_pod_clients": {
+        "default": "mdi:access-point-network"
+      },
+      "speed_test_download": {
+        "default": "mdi:speedometer"
+      },
+      "speed_test_upload": {
+        "default": "mdi:speedometer"
+      },
+      "speed_test_latency": {
+        "default": "mdi:timer-outline"
+      },
+      "speed_test_last_run": {
+        "default": "mdi:history"
+      },
+      "wifi_band_download": {
+        "default": "mdi:wifi-arrow-down"
+      },
+      "wifi_band_upload": {
+        "default": "mdi:wifi-arrow-up"
+      },
+      "wifi_band_channel": {
+        "default": "mdi:wifi-settings"
+      },
+      "wifi_band_noise": {
+        "default": "mdi:waveform"
+      },
+      "wifi_band_clients": {
+        "default": "mdi:wifi"
+      },
+      "wifi_band_weakest_signal": {
+        "default": "mdi:wifi-strength-1"
+      },
+      "port_link_speed": {
+        "default": "mdi:ethernet"
+      },
+      "port_download": {
+        "default": "mdi:download-network-outline"
+      },
+      "port_upload": {
+        "default": "mdi:upload-network-outline"
+      }
+    }
+  }
+}

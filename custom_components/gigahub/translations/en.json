@@ -1,0 +1,192 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to your Giga Hub",
+        "description": "Use the same login as the hub's admin page. The default username is admin and the default password is printed on the hub's label.",
+        "data": {
+          "host": "Host",
+          "username": "Username",
+          "password": "Password"
+        },
+        "data_description": {
+          "host": "The hub's address on your network. Bell's default is 192.168.2.1."
+        }
+      },
+      "reauth_confirm": {
+        "title": "Giga Hub password changed",
+        "description": "The hub rejected the saved password. Enter the current admin password.",
+        "data": {
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Couldn't reach the hub. Check the address and that it's on this network.",
+      "invalid_auth": "The hub rejected that username or password."
+    },
+    "abort": {
+      "already_configured": "This hub is already set up.",
+      "reauth_successful": "Password updated."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Polling and speed test",
+        "data": {
+          "fast_interval": "Traffic and fibre polling interval",
+          "slow_interval": "Device list polling interval",
+          "block_traffic_during_speed_test": "Pause other traffic during speed tests"
+        },
+        "data_description": {
+          "fast_interval": "Download and upload speeds are averaged over this interval.",
+          "slow_interval": "The device list is the hub's heaviest request, so poll it less often.",
+          "block_traffic_during_speed_test": "More accurate results, but everything else on the network stalls for about 30 seconds."
+        }
+      }
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "internet": {
+        "name": "Internet"
+      },
+      "fibre_problem": {
+        "name": "Fibre problem"
+      }
+    },
+    "button": {
+      "run_speed_test": {
+        "name": "Run speed test"
+      }
+    },
+    "event": {
+      "new_device": {
+        "name": "New device",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "new_device": "New device joined"
+            }
+          }
+        }
+      }
+    },
+    "sensor": {
+      "download_speed": {
+        "name": "Download speed"
+      },
+      "upload_speed": {
+        "name": "Upload speed"
+      },
+      "data_downloaded": {
+        "name": "Data downloaded"
+      },
+      "data_uploaded": {
+        "name": "Data uploaded"
+      },
+      "internet_status": {
+        "name": "Internet status"
+      },
+      "connected_since": {
+        "name": "Connected since"
+      },
+      "public_ip": {
+        "name": "Public IP"
+      },
+      "fibre_rx_power": {
+        "name": "Fibre receive power"
+      },
+      "fibre_tx_power": {
+        "name": "Fibre transmit power"
+      },
+      "fibre_temperature": {
+        "name": "Fibre module temperature"
+      },
+      "fibre_voltage": {
+        "name": "Fibre module voltage"
+      },
+      "fibre_bias_current": {
+        "name": "Fibre laser bias current"
+      },
+      "fibre_errors": {
+        "name": "Fibre errors"
+      },
+      "fibre_alarm": {
+        "name": "Fibre alarm"
+      },
+      "last_boot": {
+        "name": "Last boot"
+      },
+      "memory_used": {
+        "name": "Memory used"
+      },
+      "firmware": {
+        "name": "Firmware"
+      },
+      "reboot_count": {
+        "name": "Reboot count"
+      },
+      "devices_connected": {
+        "name": "Devices connected"
+      },
+      "wired_devices": {
+        "name": "Wired devices"
+      },
+      "wifi_devices": {
+        "name": "Wi-Fi devices"
+      },
+      "wifi_pod_clients": {
+        "name": "Wi-Fi devices on pods"
+      },
+      "speed_test_download": {
+        "name": "Speed test download"
+      },
+      "speed_test_upload": {
+        "name": "Speed test upload"
+      },
+      "speed_test_latency": {
+        "name": "Speed test latency"
+      },
+      "speed_test_last_run": {
+        "name": "Speed test last run"
+      },
+      "wifi_band_download": {
+        "name": "{band} download"
+      },
+      "wifi_band_upload": {
+        "name": "{band} upload"
+      },
+      "wifi_band_channel": {
+        "name": "{band} channel"
+      },
+      "wifi_band_noise": {
+        "name": "{band} noise floor"
+      },
+      "wifi_band_clients": {
+        "name": "{band} clients"
+      },
+      "wifi_band_weakest_signal": {
+        "name": "{band} weakest signal"
+      },
+      "port_link_speed": {
+        "name": "LAN port {port} link speed"
+      },
+      "port_download": {
+        "name": "LAN port {port} download"
+      },
+      "port_upload": {
+        "name": "LAN port {port} upload"
+      }
+    }
+  },
+  "exceptions": {
+    "speed_test_failed": {
+      "message": "The speed test failed: {error}"
+    },
+    "reboot_failed": {
+      "message": "The hub didn't accept the reboot: {error}"
+    }
+  }
+}

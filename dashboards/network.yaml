@@ -1,0 +1,305 @@
+# A "Network" dashboard view for the Bell Giga Hub integration.
+# Needs mini-graph-card (Marketplace) for the live graphs; everything else is built in.
+# Add it with: Dashboard > ⋮ > Edit > ⋮ > Raw configuration editor, and paste this under `views:`.
+title: Network
+path: network
+icon: mdi:router-network
+type: sections
+max_columns: 4
+sections:
+  - type: grid
+    cards:
+      - type: heading
+        heading: Internet
+        heading_style: title
+        icon: mdi:web
+      - type: tile
+        entity: binary_sensor.giga_hub_internet
+        name: Internet
+      - type: tile
+        entity: sensor.giga_hub_connected_since
+        name: Connected since
+      - type: custom:mini-graph-card
+        name: Speed (live)
+        icon: mdi:swap-vertical
+        hours_to_show: 6
+        points_per_hour: 120
+        line_width: 2
+        smoothing: true
+        show:
+          fill: fade
+          legend: true
+          extrema: true
+        entities:
+          - entity: sensor.giga_hub_download_speed
+            name: Download
+          - entity: sensor.giga_hub_upload_speed
+            name: Upload
+        grid_options:
+          columns: full
+      - type: custom:mini-graph-card
+        name: Speed (24 h, 5-min peaks)
+        hours_to_show: 24
+        points_per_hour: 12
+        aggregate_func: max
+        line_width: 2
+        show:
+          fill: fade
+          legend: false
+        entities:
+          - entity: sensor.giga_hub_download_speed
+            name: Download
+          - entity: sensor.giga_hub_upload_speed
+            name: Upload
+        grid_options:
+          columns: full
+
+  - type: grid
+    cards:
+      - type: heading
+        heading: Data usage
+        heading_style: title
+        icon: mdi:chart-bar
+      - type: statistics-graph
+        title: Daily (last 30 days)
+        chart_type: bar
+        period: day
+        days_to_show: 30
+        stat_types: [change]
+        entities:
+          - entity: sensor.giga_hub_data_downloaded
+            name: Downloaded
+          - entity: sensor.giga_hub_data_uploaded
+            name: Uploaded
+        grid_options:
+          columns: full
+      - type: statistics-graph
+        title: Monthly
+        chart_type: bar
+        period: month
+        days_to_show: 365
+        stat_types: [change]
+        entities:
+          - entity: sensor.giga_hub_data_downloaded
+            name: Downloaded
+          - entity: sensor.giga_hub_data_uploaded
+            name: Uploaded
+        grid_options:
+          columns: full
+      - type: statistic
+        entity: sensor.giga_hub_data_downloaded
+        name: Downloaded this month
+        period:
+          calendar:
+            period: month
+        stat_type: change
+      - type: statistic
+        entity: sensor.giga_hub_data_uploaded
+        name: Uploaded this month
+        period:
+          calendar:
+            period: month
+        stat_type: change
+
+  - type: grid
+    cards:
+      - type: heading
+        heading: Speed test
+        heading_style: title
+        icon: mdi:speedometer
+        badges:
+          - type: entity
+            entity: sensor.giga_hub_speed_test_last_run
+            show_state: true
+      - type: tile
+        entity: sensor.giga_hub_speed_test_download
+        name: Download
+      - type: tile
+        entity: sensor.giga_hub_speed_test_upload
+        name: Upload
+      - type: tile
+        entity: sensor.giga_hub_speed_test_latency
+        name: Latency
+      - type: tile
+        entity: button.giga_hub_run_speed_test
+        name: Run speed test
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.giga_hub_run_speed_test
+          confirmation:
+            text: Run the hub's speed test? It saturates the line for about 30 seconds.
+      - type: statistics-graph
+        title: Speed test history
+        chart_type: line
+        period: day
+        days_to_show: 90
+        stat_types: [max]
+        entities:
+          - entity: sensor.giga_hub_speed_test_download
+            name: Download
+          - entity: sensor.giga_hub_speed_test_upload
+            name: Upload
+        grid_options:
+          columns: full
+
+  - type: grid
+    cards:
+      - type: heading
+        heading: Fibre line
+        heading_style: title
+        icon: mdi:led-on
+      - type: tile
+        entity: binary_sensor.giga_hub_fibre_problem
+        name: Fibre
+      - type: tile
+        entity: sensor.giga_hub_fibre_errors
+        name: Errors
+      - type: custom:mini-graph-card
+        name: Receive power (7 days)
+        icon: mdi:led-on
+        hours_to_show: 168
+        points_per_hour: 2
+        decimals: 2
+        line_width: 2
+        show:
+          extrema: true
+          fill: false
+        # Healthy XGS-PON receive is roughly -8 to -26 dBm. Below about -24 starts to get marginal.
+        color_thresholds:
+          - value: -28
+            color: "#db4437"
+          - value: -24
+            color: "#f4b400"
+          - value: -20
+            color: "#0f9d58"
+        entities:
+          - sensor.giga_hub_fibre_receive_power
+        grid_options:
+          columns: full
+      - type: tile
+        entity: sensor.giga_hub_fibre_transmit_power
+        name: Transmit power
+      - type: tile
+        entity: sensor.giga_hub_fibre_module_temperature
+        name: Module temperature
+
+  - type: grid
+    cards:
+      - type: heading
+        heading: Wi-Fi
+        heading_style: title
+        icon: mdi:wifi
+      - type: tile
+        entity: sensor.giga_hub_2_4_ghz_clients
+        name: 2.4 GHz
+      - type: tile
+        entity: sensor.giga_hub_5_ghz_clients
+        name: 5 GHz
+      - type: tile
+        entity: sensor.giga_hub_6_ghz_clients
+        name: 6 GHz
+      - type: tile
+        entity: sensor.giga_hub_wi_fi_devices_on_pods
+        name: On pods
+      - type: custom:mini-graph-card
+        name: Wi-Fi traffic to clients (6 h)
+        hours_to_show: 6
+        points_per_hour: 60
+        line_width: 2
+        smoothing: true
+        show:
+          fill: false
+          legend: true
+        entities:
+          - entity: sensor.giga_hub_2_4_ghz_download
+            name: 2.4 GHz
+          - entity: sensor.giga_hub_5_ghz_download
+            name: 5 GHz
+          - entity: sensor.giga_hub_6_ghz_download
+            name: 6 GHz
+        grid_options:
+          columns: full
+      - type: markdown
+        title: Clients on the hub's radios
+        content: |
+          {% for band in ['2_4', '5', '6'] -%}
+          {% set clients = state_attr('sensor.giga_hub_' ~ band ~ '_ghz_clients', 'clients') or {} -%}
+          {% if clients -%}
+          **{{ band | replace('_', '.') }} GHz** · channel {{ states('sensor.giga_hub_' ~ band ~ '_ghz_channel') }} ({{ state_attr('sensor.giga_hub_' ~ band ~ '_ghz_channel', 'bandwidth') }})
+
+          | Device | Signal | Link ↓ / ↑ |
+          |:--|--:|--:|
+          {% for name, c in clients.items() -%}
+          | {{ name }} | {{ c.signal_dbm }} dBm {{ '🟢' if c.signal_dbm >= -60 else ('🟡' if c.signal_dbm >= -70 else '🔴') }} | {{ c.link_down_mbps }} / {{ c.link_up_mbps }} Mbps |
+          {% endfor %}
+
+          {% endif -%}
+          {% endfor %}
+        grid_options:
+          columns: full
+
+  - type: grid
+    cards:
+      - type: heading
+        heading: Devices
+        heading_style: title
+        icon: mdi:devices
+      - type: tile
+        entity: sensor.giga_hub_devices_connected
+        name: Connected
+      - type: tile
+        entity: sensor.giga_hub_wired_devices
+        name: Wired
+      - type: custom:mini-graph-card
+        name: Devices online (7 days)
+        hours_to_show: 168
+        points_per_hour: 1
+        line_width: 2
+        show:
+          fill: fade
+          legend: true
+        entities:
+          - entity: sensor.giga_hub_wi_fi_devices
+            name: Wi-Fi
+          - entity: sensor.giga_hub_wired_devices
+            name: Wired
+        grid_options:
+          columns: full
+      - type: logbook
+        title: New devices
+        target:
+          entity_id: event.giga_hub_new_device
+        hours_to_show: 720
+        grid_options:
+          columns: full
+
+  - type: grid
+    cards:
+      - type: heading
+        heading: Hub
+        heading_style: title
+        icon: mdi:router-wireless
+      - type: tile
+        entity: sensor.giga_hub_last_boot
+        name: Last boot
+      - type: tile
+        entity: sensor.giga_hub_memory_used
+        name: Memory
+      - type: tile
+        entity: sensor.giga_hub_lan_port_1_link_speed
+        name: LAN port 1
+      - type: tile
+        entity: sensor.giga_hub_lan_port_2_link_speed
+        name: LAN port 2
+      - type: tile
+        entity: button.giga_hub_restart
+        name: Restart hub
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.giga_hub_restart
+          confirmation:
+            text: Restart the Giga Hub? Internet and Wi-Fi drop for a few minutes.
