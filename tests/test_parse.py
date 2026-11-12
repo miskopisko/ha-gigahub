@@ -345,22 +345,22 @@ def test_short_vendor() -> None:
 
 
 def test_private_mac_and_mac_like_names() -> None:
-    assert parse.is_private_mac("4e:e0:d4:2a:07:59")
-    assert not parse.is_private_mac("48:a5:e7:38:a5:33")
-    assert parse.looks_like_mac("E8:5C:5F:A8:03:9C")
+    assert parse.is_private_mac("4e:00:00:11:22:33")
+    assert not parse.is_private_mac("48:a5:e7:12:34:56")
+    assert parse.looks_like_mac("E8:5C:5F:AB:CD:EF")
     assert parse.looks_like_mac("e85c5fa8039c")
     assert not parse.looks_like_mac("Google-Home-Mini")
 
 
 NAMING_HOSTS = [
-    {"phys_address": "48:A5:E7:38:A5:33", "host_name": "48:A5:E7:38:A5:33", "active": True},
+    {"phys_address": "48:A5:E7:12:34:56", "host_name": "48:A5:E7:12:34:56", "active": True},
     {
-        "phys_address": "E8:5C:5F:A8:03:9C",
-        "host_name": "E8:5C:5F:A8:03:9C",
+        "phys_address": "E8:5C:5F:AB:CD:EF",
+        "host_name": "E8:5C:5F:AB:CD:EF",
         "vendor_class_id": "android-dhcp-14",
         "active": True,
     },
-    {"phys_address": "4E:E0:D4:2A:07:59", "host_name": "4e:e0:d4:2a:07:59", "active": True},
+    {"phys_address": "4E:00:00:11:22:33", "host_name": "4e:00:00:11:22:33", "active": True},
     {"phys_address": "00:11:22:33:44:55", "host_name": "", "active": True},
     {
         "phys_address": "AA:BB:CC:00:00:01",
@@ -378,7 +378,7 @@ NAMING_HOSTS = [
 VENDORS = {
     "48:a5:e7": "Nintendo Co.,Ltd",
     "e8:5c:5f": "FN-LINK TECHNOLOGY Ltd.",
-    "4e:e0:d4": "Should Not Be Used",
+    "4e:00:00": "Should Not Be Used",
     "aa:bb:cc": "Google, Inc.",
 }
 
@@ -388,15 +388,15 @@ def test_assign_names() -> None:
     parse.assign_names(snap, lambda mac: VENDORS.get(mac[:8]), {"AA:BB:CC:00:00:01": "Living room"})
     names = [h.name for h in snap.hosts]
     assert names == [
-        "Nintendo (38:A5:33)",  # vendor from the MAC
-        "Android device (A8:03:9C)",  # DHCP hint beats the Wi-Fi chip's maker
-        "Private address (2A:07:59)",  # randomised MAC: no vendor lookup
+        "Nintendo (12:34:56)",  # vendor from the MAC
+        "Android device (AB:CD:EF)",  # DHCP hint beats the Wi-Fi chip's maker
+        "Private address (11:22:33)",  # randomised MAC: no vendor lookup
         "00:11:22:33:44:55",  # nothing known
         "Living room",  # the user's name beats the hub's
         "Kitchen speaker",  # a name set in the hub's web page
     ]
     assert snap.hosts[2].vendor is None
-    assert snap.vendors["48:a5:e7:38:a5:33"] == "Nintendo"
+    assert snap.vendors["48:a5:e7:12:34:56"] == "Nintendo"
     # Wi-Fi clients missing from the host table still get a friendly name.
     assert snap.name_for("48:a5:e7:00:00:01") == "Nintendo (00:00:01)"
 
@@ -408,4 +408,4 @@ def test_assign_names_survives_lookup_errors() -> None:
         raise RuntimeError("no database")
 
     parse.assign_names(snap, broken, None)
-    assert snap.hosts[0].name == "48:A5:E7:38:A5:33"
+    assert snap.hosts[0].name == "48:A5:E7:12:34:56"

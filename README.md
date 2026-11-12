@@ -36,7 +36,7 @@ what the hub's own speed test says your line can do, and how well every Wi-Fi cl
 **Devices and hub**
 - Devices connected, wired, Wi-Fi (names as attributes)
 - Friendly device names: when the hub only knows a MAC address, the device is named after its
-  manufacturer (from the MAC prefix), e.g. *Nintendo (38:A5:33)*, or *Android device* / *Private
+  manufacturer (from the MAC prefix), e.g. *Nintendo (12:34:56)*, or *Android device* / *Private
   address* when that's all there is to go on. You can name any device yourself (see Options).
 - A *New device* event entity that fires when a device the hub has never seen joins
 - LAN port link speed and traffic per port (unused ports are added disabled)
