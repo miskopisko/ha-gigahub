@@ -124,9 +124,9 @@ uvx pytest
 uvx ruff check .
 ```
 
-The integration icon is drawn in `assets/icon.svg` and exported to
-`custom_components/gigahub/brand/icon.png` (256 px) and `icon@2x.png` (512 px), which Home Assistant
-2026.3+ picks up on its own.
+The integration icon (`custom_components/gigahub/brand/icon.png`) is the Bell Wi-Fi icon the Giga Hub
+serves on its own admin page, upscaled from 128 to 256 px. Home Assistant 2026.3+ picks it up on its own.
+Bell and the Bell logo are trademarks of Bell Canada, used here only to show which hub this works with.
 
 Built on [python-sagemcom-api](https://github.com/imicknl/python-sagemcom-api). Not affiliated with
 Bell Canada or Sagemcom.
