@@ -12,6 +12,12 @@
         "state": {
           "on": "mdi:alert-circle"
         }
+      },
+      "speed_test_running": {
+        "default": "mdi:speedometer-slow",
+        "state": {
+          "on": "mdi:speedometer"
+        }
       }
     },
     "button": {

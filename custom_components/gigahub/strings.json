@@ -33,15 +33,17 @@
   "options": {
     "step": {
       "init": {
-        "title": "Polling and speed test",
+        "title": "Polling and speed tests",
         "data": {
           "fast_interval": "Traffic and fibre polling interval",
           "slow_interval": "Device list polling interval",
+          "speed_test_interval": "Run a speed test every",
           "block_traffic_during_speed_test": "Pause other traffic during speed tests"
         },
         "data_description": {
           "fast_interval": "Download and upload speeds are averaged over this interval.",
           "slow_interval": "The device list is the hub's heaviest request, so poll it less often.",
+          "speed_test_interval": "Hours between automatic speed tests. 0 turns them off. Each test fills the line for about 30 seconds; its traffic is left out of the data totals.",
           "block_traffic_during_speed_test": "More accurate results, but everything else on the network stalls for about 30 seconds."
         }
       }
@@ -54,6 +56,9 @@
       },
       "fibre_problem": {
         "name": "Fibre problem"
+      },
+      "speed_test_running": {
+        "name": "Speed test running"
       }
     },
     "button": {

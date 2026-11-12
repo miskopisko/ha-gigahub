@@ -10,7 +10,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
 from . import GigaHubConfigEntry
 from .api import GigaHubAuthError, GigaHubConnectionError
-from .const import CONF_BLOCK_TRAFFIC, DOMAIN
+from .const import DOMAIN
 from .coordinator import GigaHubSlowCoordinator
 from .entity import GigaHubEntity
 
@@ -29,32 +29,25 @@ class GigaHubSpeedTestButton(GigaHubEntity[GigaHubSlowCoordinator], ButtonEntity
 
     def __init__(self, coordinator, entry: GigaHubConfigEntry) -> None:
         super().__init__(coordinator, entry, SPEED_TEST)
-        self._entry = entry
-        self._running = False
+        self._runner = entry.runtime_data.speed_test
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        self.async_on_remove(self._runner.async_add_listener(self.async_write_ha_state))
 
     @property
     def available(self) -> bool:
-        return super().available and not self._running
+        return super().available and not self._runner.running
 
     async def async_press(self) -> None:
-        if self._running:
-            return
-        self._running = True
-        self.async_write_ha_state()
         try:
-            await self._entry.runtime_data.api.run_speed_test(
-                block_traffic=self._entry.options.get(CONF_BLOCK_TRAFFIC, False)
-            )
+            await self._runner.async_run()
         except (GigaHubAuthError, GigaHubConnectionError) as err:
             raise HomeAssistantError(
                 translation_domain=DOMAIN,
                 translation_key="speed_test_failed",
                 translation_placeholders={"error": str(err)},
             ) from err
-        finally:
-            self._running = False
-            self.async_write_ha_state()
-        await self.coordinator.async_request_refresh()
 
 
 class GigaHubRebootButton(GigaHubEntity[GigaHubSlowCoordinator], ButtonEntity):

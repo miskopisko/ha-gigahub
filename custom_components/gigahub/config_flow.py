@@ -17,6 +17,7 @@ from .const import (
     CONF_BLOCK_TRAFFIC,
     CONF_FAST_INTERVAL,
     CONF_SLOW_INTERVAL,
+    CONF_SPEED_TEST_INTERVAL,
     DEFAULT_FAST_INTERVAL,
     DEFAULT_HOST,
     DEFAULT_SLOW_INTERVAL,
@@ -126,6 +127,18 @@ class GigaHubOptionsFlow(OptionsFlow):
                         max=3600,
                         step=30,
                         unit_of_measurement="s",
+                        mode=selector.NumberSelectorMode.BOX,
+                    )
+                ),
+                vol.Required(
+                    CONF_SPEED_TEST_INTERVAL,
+                    default=options.get(CONF_SPEED_TEST_INTERVAL, 0),
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=0,
+                        max=168,
+                        step=1,
+                        unit_of_measurement="h",
                         mode=selector.NumberSelectorMode.BOX,
                     )
                 ),

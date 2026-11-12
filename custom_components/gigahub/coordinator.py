@@ -14,19 +14,23 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .api import GigaHubApi, GigaHubAuthError, GigaHubConnectionError
 from .const import DOMAIN
-from .parse import FastSnapshot, Host, SlowSnapshot, rate_mbps
+from .parse import FastSnapshot, Host, SlowSnapshot, TrafficLedger, rate_mbps
 
 if TYPE_CHECKING:
     from . import GigaHubConfigEntry
 
 _LOGGER = logging.getLogger(__name__)
 STORAGE_VERSION = 1
+LEDGER_SAVE_DELAY = 60  # seconds; the ledger changes every poll, so debounce writes
 
 
 @dataclass(slots=True)
 class FastData:
     snapshot: FastSnapshot
     rates: dict[str, float | None] = field(default_factory=dict)
+    # Internet totals with the integration's own speed tests taken out.
+    bytes_received: int | None = None
+    bytes_sent: int | None = None
 
 
 class GigaHubFastCoordinator(DataUpdateCoordinator[FastData]):
@@ -45,7 +49,13 @@ class GigaHubFastCoordinator(DataUpdateCoordinator[FastData]):
             update_interval=timedelta(seconds=interval),
         )
         self.api = api
-        self._previous: tuple[FastSnapshot, float] | None = None
+        self._previous: tuple[FastData, float] | None = None
+        # Set by the speed test runner while a test is in flight.
+        self.excluding_speed_test = False
+        self._ledger_store: Store[dict[str, int | None]] = Store(
+            hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}.traffic_ledger"
+        )
+        self._ledger: TrafficLedger | None = None
 
     async def _async_update_data(self) -> FastData:
         try:
@@ -55,15 +65,24 @@ class GigaHubFastCoordinator(DataUpdateCoordinator[FastData]):
         except GigaHubConnectionError as err:
             raise UpdateFailed(str(err)) from err
 
-        rates: dict[str, float | None] = {}
+        if self._ledger is None:
+            self._ledger = TrafficLedger.from_dict(await self._ledger_store.async_load())
+        received, sent = self._ledger.update(
+            snapshot.wan.bytes_received if snapshot.wan else None,
+            snapshot.wan.bytes_sent if snapshot.wan else None,
+            self.excluding_speed_test,
+        )
+        ledger = self._ledger
+        self._ledger_store.async_delay_save(ledger.as_dict, LEDGER_SAVE_DELAY)
+        data = FastData(snapshot=snapshot, bytes_received=received, bytes_sent=sent)
+
+        rates = data.rates
         if self._previous is not None:
-            old, old_at = self._previous
+            old_data, old_at = self._previous
+            old = old_data.snapshot
             seconds = taken_at - old_at
-            if snapshot.wan and old.wan:
-                rates["wan_download"] = rate_mbps(
-                    snapshot.wan.bytes_received, old.wan.bytes_received, seconds
-                )
-                rates["wan_upload"] = rate_mbps(snapshot.wan.bytes_sent, old.wan.bytes_sent, seconds)
+            rates["wan_download"] = rate_mbps(received, old_data.bytes_received, seconds)
+            rates["wan_upload"] = rate_mbps(sent, old_data.bytes_sent, seconds)
             for band, traffic in snapshot.wifi_traffic.items():
                 old_traffic = old.wifi_traffic.get(band)
                 if old_traffic is None:
@@ -86,8 +105,8 @@ class GigaHubFastCoordinator(DataUpdateCoordinator[FastData]):
                 rates[f"port_{port.number}_upload"] = rate_mbps(
                     port.bytes_received, old_port.bytes_received, seconds
                 )
-        self._previous = (snapshot, taken_at)
-        return FastData(snapshot=snapshot, rates=rates)
+        self._previous = (data, taken_at)
+        return data
 
 
 class GigaHubSlowCoordinator(DataUpdateCoordinator[SlowSnapshot]):

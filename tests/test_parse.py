@@ -297,3 +297,38 @@ def test_speed_test_status_field_used_by_5690() -> None:
     result, state = parse.parse_speed_test(raw)
     assert state == "COMPLETE"
     assert result.jitter_ms == 1.5
+
+
+GB = 1_000_000_000
+
+
+def test_ledger_excludes_speed_test_traffic() -> None:
+    ledger = parse.TrafficLedger()
+    assert ledger.update(100 * GB, 10 * GB, excluding=False) == (100 * GB, 10 * GB)
+    assert ledger.update(101 * GB, 11 * GB, excluding=False) == (101 * GB, 11 * GB)
+    # A speed test pushes 6 GB down and 7 GB up while excluding: totals stay flat.
+    assert ledger.update(107 * GB, 18 * GB, excluding=True) == (101 * GB, 11 * GB)
+    # Normal traffic afterwards counts again, on top of the adjusted totals.
+    assert ledger.update(108 * GB, 19 * GB, excluding=False) == (102 * GB, 12 * GB)
+    assert ledger.offset_rx == 6 * GB and ledger.offset_tx == 7 * GB
+
+
+def test_ledger_resets_offsets_when_hub_reboots() -> None:
+    ledger = parse.TrafficLedger(offset_rx=6 * GB, offset_tx=7 * GB, last_rx=108 * GB, last_tx=19 * GB)
+    # Counters restart near zero after a reboot; the offsets belonged to the old counters.
+    assert ledger.update(1 * GB, 1 * GB, excluding=False) == (1 * GB, 1 * GB)
+    assert ledger.offset_rx == 0 and ledger.offset_tx == 0
+
+
+def test_ledger_round_trips_and_handles_reboot_while_away() -> None:
+    saved = parse.TrafficLedger(offset_rx=5 * GB, offset_tx=5 * GB, last_rx=None, last_tx=None).as_dict()
+    ledger = parse.TrafficLedger.from_dict(saved)
+    # No last reading, and the counters are already below the offsets: the hub rebooted.
+    assert ledger.update(2 * GB, 3 * GB, excluding=False) == (2 * GB, 3 * GB)
+    assert parse.TrafficLedger.from_dict(None) == parse.TrafficLedger()
+
+
+def test_ledger_ignores_missing_counters() -> None:
+    ledger = parse.TrafficLedger()
+    assert ledger.update(None, 5, excluding=True) == (None, None)
+    assert ledger.last_rx is None

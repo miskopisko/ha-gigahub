@@ -86,7 +86,7 @@ INTERNET: tuple[FastSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfInformation.BYTES,
         suggested_unit_of_measurement=UnitOfInformation.GIGABYTES,
         suggested_display_precision=2,
-        value_fn=lambda d: d.snapshot.wan.bytes_received if d.snapshot.wan else None,
+        value_fn=lambda d: d.bytes_received,
     ),
     FastSensorDescription(
         key="data_uploaded",
@@ -96,7 +96,7 @@ INTERNET: tuple[FastSensorDescription, ...] = (
         native_unit_of_measurement=UnitOfInformation.BYTES,
         suggested_unit_of_measurement=UnitOfInformation.GIGABYTES,
         suggested_display_precision=2,
-        value_fn=lambda d: d.snapshot.wan.bytes_sent if d.snapshot.wan else None,
+        value_fn=lambda d: d.bytes_sent,
     ),
     FastSensorDescription(
         key="internet_status",

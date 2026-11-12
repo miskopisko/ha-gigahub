@@ -64,6 +64,57 @@ def rate_mbps(new: int | None, old: int | None, seconds: float) -> float | None:
     return round((new - old) * 8 / seconds / 1_000_000, 3)
 
 
+# --------------------------------------------------------------------------- speed-test exclusion
+
+
+@dataclass(slots=True)
+class TrafficLedger:
+    """Keeps the hub's own speed tests out of the internet traffic totals.
+
+    While a test the integration started is running, every byte the WAN counters
+    gain goes into an offset instead, and the reported totals are counter - offset.
+    The hub's counters reset to zero when it reboots; the offsets go with them.
+    """
+
+    offset_rx: int = 0
+    offset_tx: int = 0
+    last_rx: int | None = None
+    last_tx: int | None = None
+
+    def update(self, rx: int | None, tx: int | None, excluding: bool) -> tuple[int | None, int | None]:
+        if rx is None or tx is None:
+            return None, None
+        if self.last_rx is not None and self.last_tx is not None:
+            if rx < self.last_rx or tx < self.last_tx:
+                self.offset_rx = self.offset_tx = 0
+            elif excluding:
+                self.offset_rx += rx - self.last_rx
+                self.offset_tx += tx - self.last_tx
+        if rx < self.offset_rx or tx < self.offset_tx:
+            # The hub rebooted while we weren't watching.
+            self.offset_rx = self.offset_tx = 0
+        self.last_rx, self.last_tx = rx, tx
+        return rx - self.offset_rx, tx - self.offset_tx
+
+    def as_dict(self) -> dict[str, int | None]:
+        return {
+            "offset_rx": self.offset_rx,
+            "offset_tx": self.offset_tx,
+            "last_rx": self.last_rx,
+            "last_tx": self.last_tx,
+        }
+
+    @classmethod
+    def from_dict(cls, data: dict[str, Any] | None) -> TrafficLedger:
+        data = data or {}
+        return cls(
+            offset_rx=_int(data.get("offset_rx")) or 0,
+            offset_tx=_int(data.get("offset_tx")) or 0,
+            last_rx=_int(data.get("last_rx")),
+            last_tx=_int(data.get("last_tx")),
+        )
+
+
 # --------------------------------------------------------------------------- fast
 
 

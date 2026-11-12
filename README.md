@@ -18,8 +18,10 @@ what the hub's own speed test says your line can do, and how well every Wi-Fi cl
 **Speed test**
 - A *Run speed test* button that starts the hub's built-in test against Bell's servers. It measures
   the fibre line itself, so it isn't capped by a 1 Gbit/s LAN port the way a test from a computer is.
+- Optional automatic tests every N hours, so it can replace the Speedtest.net integration for
+  tracking your line over time
 - Download, upload, latency and last-run sensors (the last result is picked up even if the test was
-  started from the hub's web page)
+  started from the hub's web page), plus a *Speed test running* sensor
 
 **Fibre line**
 - Receive and transmit optical power (dBm), module temperature, voltage, laser bias current
@@ -54,6 +56,7 @@ what the hub's own speed test says your line can do, and how well every Wi-Fi cl
 |---|---|---|
 | Traffic and fibre polling interval | 30 s | Speeds are averaged over this window. One small request. |
 | Device list polling interval | 300 s | The device list is the hub's heaviest request (a few hundred KB), so it's polled less often. |
+| Run a speed test every | 0 h (off) | Automatic speed tests. The first one runs one interval after Home Assistant starts. |
 | Pause other traffic during speed tests | off | More accurate result; everything else on the network stalls for ~30 s. |
 
 ## Dashboard
@@ -87,7 +90,8 @@ actions:
         joined over {{ trigger.to_state.attributes.connection }}.
 ```
 
-Run the hub's speed test every night at 4 a.m.:
+For tests every N hours, use the *Run a speed test every* option instead. To run one at a fixed
+time, say 4 a.m.:
 
 ```yaml
 triggers:
@@ -107,6 +111,12 @@ actions:
 - **The first run doesn't announce every device.** The *New device* event seeds itself from the
   hub's own device history, then fires only for MAC addresses it hasn't seen before. Phones with
   private (randomised) Wi-Fi addresses can show up as new when they rotate their address.
+- **Speed-test traffic is left out of the data totals, but only for tests this integration
+  starts.** The hub counts its own speed test oddly: each test adds roughly 7 GB of *upload* to the
+  internet counters but only a fraction of the download. Tests started from the button or the
+  automatic schedule are subtracted from *Data downloaded / uploaded* and the live speed graphs.
+  Tests started from the hub's own web page aren't, so each of those adds about 7 GB to the upload
+  total.
 - **Counters reset when the hub reboots.** The data totals are `total_increasing`, so Home
   Assistant's statistics handle the reset without a negative day.
 - **One login session.** The integration keeps one session open and serialises its requests. Logging
