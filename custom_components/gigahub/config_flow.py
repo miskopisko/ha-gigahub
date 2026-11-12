@@ -15,6 +15,7 @@ from homeassistant.helpers.device_registry import format_mac
 from .api import GigaHubApi, GigaHubAuthError, GigaHubConnectionError, HubIdentity
 from .const import (
     CONF_BLOCK_TRAFFIC,
+    CONF_DEVICE_NAMES,
     CONF_FAST_INTERVAL,
     CONF_SLOW_INTERVAL,
     CONF_SPEED_TEST_INTERVAL,
@@ -99,11 +100,31 @@ class GigaHubConfigFlow(ConfigFlow, domain=DOMAIN):
 
 
 class GigaHubOptionsFlow(OptionsFlow):
-    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
-        if user_input is not None:
-            return self.async_create_entry(data=user_input)
+    """A menu: polling and speed-test settings, or naming devices. Changes are kept
+    until "Save and close" so several devices can be named in one go."""
 
-        options = self.config_entry.options
+    def __init__(self) -> None:
+        self._options: dict[str, Any] | None = None
+
+    @property
+    def _opts(self) -> dict[str, Any]:
+        if self._options is None:
+            self._options = dict(self.config_entry.options)
+            self._options[CONF_DEVICE_NAMES] = dict(self._options.get(CONF_DEVICE_NAMES) or {})
+        return self._options
+
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        return self.async_show_menu(step_id="init", menu_options=["settings", "device_names", "finish"])
+
+    async def async_step_finish(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        return self.async_create_entry(data=self._opts)
+
+    async def async_step_settings(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        if user_input is not None:
+            self._opts.update(user_input)
+            return await self.async_step_init()
+
+        options = self._opts
         schema = vol.Schema(
             {
                 vol.Required(
@@ -145,4 +166,52 @@ class GigaHubOptionsFlow(OptionsFlow):
                 vol.Required(CONF_BLOCK_TRAFFIC, default=options.get(CONF_BLOCK_TRAFFIC, False)): bool,
             }
         )
-        return self.async_show_form(step_id="init", data_schema=schema)
+        return self.async_show_form(step_id="settings", data_schema=schema)
+
+    async def async_step_device_names(self, user_input: dict[str, Any] | None = None) -> ConfigFlowResult:
+        runtime = getattr(self.config_entry, "runtime_data", None)
+        if runtime is None or runtime.slow.data is None:
+            return self.async_abort(reason="not_loaded")
+        names: dict[str, str] = self._opts[CONF_DEVICE_NAMES]
+
+        if user_input is not None:
+            mac = user_input["device"]
+            name = (user_input.get("name") or "").strip()
+            if name:
+                names[mac] = name
+            else:
+                names.pop(mac, None)
+            return await self.async_step_init()
+
+        snapshot = runtime.slow.data
+        hosts = {h.mac: h for h in snapshot.hosts}
+        # Online devices first, then any offline ones you've already named.
+        macs = [h.mac for h in sorted(snapshot.active_hosts, key=lambda h: h.name.lower())]
+        macs += sorted(m for m in names if m not in macs)
+
+        def label(mac: str) -> str:
+            host = hosts.get(mac)
+            name = names.get(mac) or (host.name if host else mac.upper())
+            parts = [name]
+            if mac.upper() not in name:
+                parts.append(mac.upper())
+            if host and host.vendor and host.vendor not in name:
+                parts.append(host.vendor)
+            if host and host.interface_type:
+                parts.append(host.interface_type.replace("WiFi", "Wi-Fi"))
+            if not (host and host.active):
+                parts.append("offline")
+            return " · ".join(parts)
+
+        schema = vol.Schema(
+            {
+                vol.Required("device"): selector.SelectSelector(
+                    selector.SelectSelectorConfig(
+                        options=[selector.SelectOptionDict(value=m, label=label(m)) for m in macs],
+                        mode=selector.SelectSelectorMode.DROPDOWN,
+                    )
+                ),
+                vol.Optional("name"): str,
+            }
+        )
+        return self.async_show_form(step_id="device_names", data_schema=schema)

@@ -7,6 +7,8 @@ and the hub sends big counters as strings, so every number goes through ``_int``
 
 from __future__ import annotations
 
+import re
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -361,6 +363,91 @@ class Host:
     active: bool
     interface_type: str | None
     band: str | None
+    hub_name: str | None = None  # a real name from the hub, never a bare MAC
+    vendor_class: str | None = None  # DHCP option 60, e.g. "android-dhcp-14"
+    vendor: str | None = None  # manufacturer from the MAC's OUI, filled in by assign_names
+    private: bool = False  # randomised ("private Wi-Fi") address
+
+
+# --------------------------------------------------------------------------- naming
+
+_MAC_RE = re.compile(r"^[0-9a-f]{2}([:-]?[0-9a-f]{2}){5}$", re.IGNORECASE)
+_VENDOR_SUFFIXES = re.compile(
+    r"[\s,.]*\b(inc|incorporated|corp|corporation|co|ltd|limited|llc|gmbh|ag|sa|bv|plc|"
+    r"technology|technologies|electronics|communications|international|holdings|group)\b\.?",
+    re.IGNORECASE,
+)
+_ANDROID_RE = re.compile(r"^android-dhcp-(\d+)", re.IGNORECASE)
+
+
+def is_private_mac(mac: str) -> bool:
+    """Phones and laptops with private Wi-Fi addresses set the locally-administered bit."""
+    try:
+        return bool(int(mac.split(":")[0], 16) & 0x02)
+    except ValueError:
+        return False
+
+
+def looks_like_mac(name: str | None) -> bool:
+    return bool(name) and bool(_MAC_RE.match(name.strip()))  # type: ignore[union-attr]
+
+
+def short_vendor(vendor: str | None) -> str | None:
+    """ "Nintendo Co.,Ltd" -> "Nintendo", "FN-LINK TECHNOLOGY Ltd." -> "FN-LINK"."""
+    if not vendor:
+        return None
+    short = vendor
+    while True:
+        trimmed = _VENDOR_SUFFIXES.sub("", short).strip(" ,.")
+        if trimmed == short or not trimmed:
+            break
+        short = trimmed
+    return short or vendor.strip()
+
+
+def suggested_name(host: Host) -> str:
+    """Best name we can make without the user's help."""
+    if host.hub_name:
+        return host.hub_name
+    tail = host.mac.upper()[-8:]
+    if host.vendor_class and _ANDROID_RE.match(host.vendor_class):
+        return f"Android device ({tail})"
+    if host.vendor:
+        return f"{host.vendor} ({tail})"
+    if host.private:
+        return f"Private address ({tail})"
+    return host.mac.upper()
+
+
+def assign_names(
+    snapshot: SlowSnapshot,
+    vendor_lookup: Callable[[str], str | None] | None,
+    custom_names: dict[str, str] | None,
+) -> None:
+    """Fill in vendors and pick each device's display name: the user's name first,
+    then the hub's, then one made from the manufacturer or DHCP hints."""
+    custom = {normalize_mac(k): v for k, v in (custom_names or {}).items() if v}
+
+    def vendor_of(mac: str) -> str | None:
+        if vendor_lookup is None or is_private_mac(mac):
+            return None
+        try:
+            return short_vendor(vendor_lookup(mac))
+        except Exception:  # a lookup failure just means no vendor
+            return None
+
+    for host in snapshot.hosts:
+        host.vendor = vendor_of(host.mac)
+        host.name = custom.get(host.mac) or suggested_name(host)
+    snapshot.names = {h.mac: h.name for h in snapshot.hosts}
+    snapshot.vendors = {h.mac: h.vendor for h in snapshot.hosts if h.vendor}
+
+    def fallback(mac: str) -> str:
+        stray = Host(mac, mac.upper(), None, False, None, None, private=is_private_mac(mac))
+        stray.vendor = vendor_of(mac)
+        return custom.get(mac) or suggested_name(stray)
+
+    snapshot.namer = fallback
 
 
 @dataclass(slots=True)
@@ -393,6 +480,8 @@ class SlowSnapshot:
     firmware: str | None
     reboot_count: int | None
     names: dict[str, str] = field(default_factory=dict)
+    vendors: dict[str, str] = field(default_factory=dict)
+    namer: Callable[[str], str] | None = None
 
     @property
     def active_hosts(self) -> list[Host]:
@@ -402,7 +491,9 @@ class SlowSnapshot:
         return [c for c in self.wifi_clients if c.band == band]
 
     def name_for(self, mac: str) -> str:
-        return self.names.get(mac) or mac.upper()
+        if mac in self.names:
+            return self.names[mac]
+        return self.namer(mac) if self.namer else mac.upper()
 
 
 def parse_hosts(raw: Any) -> list[Host]:
@@ -414,20 +505,29 @@ def parse_hosts(raw: Any) -> list[Host]:
         mac = normalize_mac(host.get("phys_address"))
         if not mac:
             continue
-        name = (
-            host.get("user_friendly_name")
-            or host.get("user_host_name")
-            or host.get("host_name")
-            or mac.upper()
+        hub_name = next(
+            (
+                n.strip()
+                for n in (
+                    host.get("user_friendly_name"),
+                    host.get("user_host_name"),
+                    host.get("host_name"),
+                )
+                if n and n.strip() and not looks_like_mac(n)
+            ),
+            None,
         )
         result.append(
             Host(
                 mac=mac,
-                name=name,
+                name=hub_name or mac.upper(),
                 ip=host.get("ip_address") or None,
                 active=bool(host.get("active")),
                 interface_type=host.get("interface_type") or None,
                 band=_band_from_ref(host.get("layer1_interface")),
+                hub_name=hub_name,
+                vendor_class=host.get("vendor_class_id") or None,
+                private=is_private_mac(mac),
             )
         )
     return result

@@ -35,6 +35,9 @@ what the hub's own speed test says your line can do, and how well every Wi-Fi cl
 
 **Devices and hub**
 - Devices connected, wired, Wi-Fi (names as attributes)
+- Friendly device names: when the hub only knows a MAC address, the device is named after its
+  manufacturer (from the MAC prefix), e.g. *Nintendo (38:A5:33)*, or *Android device* / *Private
+  address* when that's all there is to go on. You can name any device yourself (see Options).
 - A *New device* event entity that fires when a device the hub has never seen joins
 - LAN port link speed and traffic per port (unused ports are added disabled)
 - Last boot, memory use, firmware, reboot count, and a restart button
@@ -50,7 +53,15 @@ what the hub's own speed test says your line can do, and how well every Wi-Fi cl
 
 ## Options
 
-**Settings → Devices & services → Bell Giga Hub → Configure**
+**Settings → Devices & services → Bell Giga Hub → Configure** opens a menu with two pages, then
+**Save and close**.
+
+**Name devices**: pick a device from the list (it shows each one's MAC address, manufacturer and
+connection) and type a name. Name as many as you like before saving. Names are stored in Home
+Assistant, not on the hub; a name set in the hub's own web page is used when you haven't set one
+here. Leave the name empty to go back to the automatic name.
+
+**Polling and speed tests**:
 
 | Option | Default | Notes |
 |---|---|---|
@@ -108,6 +119,9 @@ actions:
 - **Bell's Wi-Fi app (Plume) may manage your Wi-Fi.** If you have pods, channels and band steering
   are chosen by Bell's cloud, so the channel sensors show what it picked. This integration only reads
   Wi-Fi settings; it never changes them.
+- **Private Wi-Fi addresses can't be traced to a manufacturer.** Phones, tablets and laptops
+  usually use a randomised MAC address per network, so they show as *Private address* until you
+  name them. Turning off "private Wi-Fi address" for your home network on the device also works.
 - **The first run doesn't announce every device.** The *New device* event seeds itself from the
   hub's own device history, then fires only for MAC addresses it hasn't seen before. Phones with
   private (randomised) Wi-Fi addresses can show up as new when they rotate their address.

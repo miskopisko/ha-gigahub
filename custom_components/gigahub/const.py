@@ -15,6 +15,7 @@ CONF_FAST_INTERVAL: Final = "fast_interval"
 CONF_SLOW_INTERVAL: Final = "slow_interval"
 CONF_BLOCK_TRAFFIC: Final = "block_traffic_during_speed_test"
 CONF_SPEED_TEST_INTERVAL: Final = "speed_test_interval"  # hours, 0 = off
+CONF_DEVICE_NAMES: Final = "device_names"  # {mac: name} set by the user in options
 
 DEFAULT_FAST_INTERVAL: Final = 30  # seconds: traffic, fibre, radios, ports
 DEFAULT_SLOW_INTERVAL: Final = 300  # seconds: device list, Wi-Fi clients, speed test history

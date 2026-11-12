@@ -33,6 +33,14 @@
   "options": {
     "step": {
       "init": {
+        "title": "Bell Giga Hub options",
+        "menu_options": {
+          "settings": "Polling and speed tests",
+          "device_names": "Name devices",
+          "finish": "Save and close"
+        }
+      },
+      "settings": {
         "title": "Polling and speed tests",
         "data": {
           "fast_interval": "Traffic and fibre polling interval",
@@ -46,7 +54,21 @@
           "speed_test_interval": "Hours between automatic speed tests. 0 turns them off. Each test fills the line for about 30 seconds; its traffic is left out of the data totals.",
           "block_traffic_during_speed_test": "More accurate results, but everything else on the network stalls for about 30 seconds."
         }
+      },
+      "device_names": {
+        "title": "Name a device",
+        "description": "Pick a device and give it a name. Leave the name empty to go back to the automatic name. You can name several devices, then choose Save and close.",
+        "data": {
+          "device": "Device",
+          "name": "Name"
+        },
+        "data_description": {
+          "device": "Devices without a name show their manufacturer (from the MAC address), or 'Private address' for phones using a private Wi-Fi address."
+        }
       }
+    },
+    "abort": {
+      "not_loaded": "The integration has to be running to list devices. Try again in a minute."
     }
   },
   "entity": {

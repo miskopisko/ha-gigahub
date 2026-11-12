@@ -39,6 +39,8 @@ class GigaHubNewDeviceEvent(GigaHubEntity[GigaHubSlowCoordinator], EventEntity):
                 EVENT_NEW_DEVICE,
                 {
                     "name": host.name,
+                    "vendor": host.vendor,
+                    "private_address": host.private,
                     "mac": host.mac.upper(),
                     "ip": host.ip,
                     "connection": host.interface_type,

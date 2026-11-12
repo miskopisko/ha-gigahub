@@ -332,3 +332,80 @@ def test_ledger_ignores_missing_counters() -> None:
     ledger = parse.TrafficLedger()
     assert ledger.update(None, 5, excluding=True) == (None, None)
     assert ledger.last_rx is None
+
+
+def test_short_vendor() -> None:
+    assert parse.short_vendor("Nintendo Co.,Ltd") == "Nintendo"
+    assert parse.short_vendor("Google, Inc.") == "Google"
+    assert parse.short_vendor("FN-LINK TECHNOLOGY Ltd.") == "FN-LINK"
+    assert parse.short_vendor("Vizio, Inc") == "Vizio"
+    assert parse.short_vendor("Commscope") == "Commscope"
+    assert parse.short_vendor("Hon Hai Precision Ind. Co.,Ltd.") == "Hon Hai Precision Ind"
+    assert parse.short_vendor(None) is None
+
+
+def test_private_mac_and_mac_like_names() -> None:
+    assert parse.is_private_mac("4e:e0:d4:2a:07:59")
+    assert not parse.is_private_mac("48:a5:e7:38:a5:33")
+    assert parse.looks_like_mac("E8:5C:5F:A8:03:9C")
+    assert parse.looks_like_mac("e85c5fa8039c")
+    assert not parse.looks_like_mac("Google-Home-Mini")
+
+
+NAMING_HOSTS = [
+    {"phys_address": "48:A5:E7:38:A5:33", "host_name": "48:A5:E7:38:A5:33", "active": True},
+    {
+        "phys_address": "E8:5C:5F:A8:03:9C",
+        "host_name": "E8:5C:5F:A8:03:9C",
+        "vendor_class_id": "android-dhcp-14",
+        "active": True,
+    },
+    {"phys_address": "4E:E0:D4:2A:07:59", "host_name": "4e:e0:d4:2a:07:59", "active": True},
+    {"phys_address": "00:11:22:33:44:55", "host_name": "", "active": True},
+    {
+        "phys_address": "AA:BB:CC:00:00:01",
+        "user_friendly_name": "",
+        "host_name": "Google-Home-Mini",
+        "active": True,
+    },
+    {
+        "phys_address": "AA:BB:CC:00:00:02",
+        "user_friendly_name": "Kitchen speaker",
+        "host_name": "x",
+        "active": True,
+    },
+]
+VENDORS = {
+    "48:a5:e7": "Nintendo Co.,Ltd",
+    "e8:5c:5f": "FN-LINK TECHNOLOGY Ltd.",
+    "4e:e0:d4": "Should Not Be Used",
+    "aa:bb:cc": "Google, Inc.",
+}
+
+
+def test_assign_names() -> None:
+    snap = parse.parse_slow({"hosts": NAMING_HOSTS}, {})
+    parse.assign_names(snap, lambda mac: VENDORS.get(mac[:8]), {"AA:BB:CC:00:00:01": "Living room"})
+    names = [h.name for h in snap.hosts]
+    assert names == [
+        "Nintendo (38:A5:33)",  # vendor from the MAC
+        "Android device (A8:03:9C)",  # DHCP hint beats the Wi-Fi chip's maker
+        "Private address (2A:07:59)",  # randomised MAC: no vendor lookup
+        "00:11:22:33:44:55",  # nothing known
+        "Living room",  # the user's name beats the hub's
+        "Kitchen speaker",  # a name set in the hub's web page
+    ]
+    assert snap.hosts[2].vendor is None
+    assert snap.vendors["48:a5:e7:38:a5:33"] == "Nintendo"
+    # Wi-Fi clients missing from the host table still get a friendly name.
+    assert snap.name_for("48:a5:e7:00:00:01") == "Nintendo (00:00:01)"
+
+
+def test_assign_names_survives_lookup_errors() -> None:
+    snap = parse.parse_slow({"hosts": NAMING_HOSTS[:1]}, {})
+
+    def broken(mac: str) -> str:
+        raise RuntimeError("no database")
+
+    parse.assign_names(snap, broken, None)
+    assert snap.hosts[0].name == "48:A5:E7:38:A5:33"

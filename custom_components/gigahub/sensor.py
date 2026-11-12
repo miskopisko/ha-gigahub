@@ -391,6 +391,8 @@ def _band_slow(band: str) -> tuple[SlowSensorDescription, ...]:
             attrs_fn=lambda s: {
                 "clients": {
                     s.name_for(c.mac): {
+                        "mac": c.mac.upper(),
+                        "vendor": s.vendors.get(c.mac),
                         "signal_dbm": c.signal_dbm,
                         "standard": c.standard,
                         "link_down_mbps": c.downlink_mbps,

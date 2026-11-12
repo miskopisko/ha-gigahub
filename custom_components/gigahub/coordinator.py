@@ -13,8 +13,8 @@ from homeassistant.helpers.storage import Store
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .api import GigaHubApi, GigaHubAuthError, GigaHubConnectionError
-from .const import DOMAIN
-from .parse import FastSnapshot, Host, SlowSnapshot, TrafficLedger, rate_mbps
+from .const import CONF_DEVICE_NAMES, DOMAIN
+from .parse import FastSnapshot, Host, SlowSnapshot, TrafficLedger, assign_names, rate_mbps
 
 if TYPE_CHECKING:
     from . import GigaHubConfigEntry
@@ -129,6 +129,7 @@ class GigaHubSlowCoordinator(DataUpdateCoordinator[SlowSnapshot]):
             hass, STORAGE_VERSION, f"{DOMAIN}.{entry.entry_id}.known_devices"
         )
         self._known: set[str] | None = None
+        self._vendor_lookup = None
         # Drained by the event entity. A queue, because the first refresh runs
         # before the entity exists and its findings must not be lost.
         self.pending_new_devices: list[Host] = []
@@ -141,6 +142,13 @@ class GigaHubSlowCoordinator(DataUpdateCoordinator[SlowSnapshot]):
         except GigaHubConnectionError as err:
             raise UpdateFailed(str(err)) from err
 
+        if self._vendor_lookup is None:
+            self._vendor_lookup = await _load_vendor_lookup()
+        assign_names(
+            snapshot,
+            self._vendor_lookup or None,
+            self.config_entry.options.get(CONF_DEVICE_NAMES),
+        )
         await self._track_new_devices(snapshot)
         return snapshot
 
@@ -162,3 +170,18 @@ class GigaHubSlowCoordinator(DataUpdateCoordinator[SlowSnapshot]):
             self.pending_new_devices.extend(new)
             self._known.update(h.mac for h in new)
             await self._store.async_save({"macs": sorted(self._known)})
+
+
+async def _load_vendor_lookup():
+    """MAC prefix -> manufacturer, from the OUI database Home Assistant already ships.
+
+    Returns False (not None) when it's unavailable, so we only try once.
+    """
+    try:
+        import aiooui
+
+        await aiooui.async_load()
+    except Exception as err:  # names just fall back to MAC addresses
+        _LOGGER.debug("MAC vendor database unavailable: %s", err)
+        return False
+    return aiooui.get_vendor
