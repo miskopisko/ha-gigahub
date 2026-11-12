@@ -82,6 +82,9 @@
       "wired_devices": {
         "default": "mdi:ethernet"
       },
+      "tv_receivers": {
+        "default": "mdi:television-box"
+      },
       "wifi_devices": {
         "default": "mdi:wifi"
       },

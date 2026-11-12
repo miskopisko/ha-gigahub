@@ -411,6 +411,7 @@ class Host:
     port: int | None = None  # LAN port number, for wired devices
     hub_name: str | None = None  # a real name from the hub, never a bare MAC
     vendor_class: str | None = None  # DHCP option 60, e.g. "android-dhcp-14"
+    device_type: str | None = None  # the hub's own guess, e.g. "STB" for a TV receiver
     vendor: str | None = None  # manufacturer from the MAC's OUI, filled in by assign_names
     private: bool = False  # randomised ("private Wi-Fi") address
 
@@ -451,11 +452,13 @@ def short_vendor(vendor: str | None) -> str | None:
     return short or vendor.strip()
 
 
-def suggested_name(host: Host) -> str:
+def suggested_name(host: Host, tv: bool = False) -> str:
     """Best name we can make without the user's help."""
     if host.hub_name:
         return host.hub_name
     tail = host.mac.upper()[-8:]
+    if tv:
+        return f"TV receiver ({tail})"
     if host.vendor_class and _ANDROID_RE.match(host.vendor_class):
         return f"Android device ({tail})"
     if host.vendor:
@@ -473,6 +476,7 @@ def assign_names(
     """Fill in vendors and pick each device's display name: the user's name first,
     then the hub's, then one made from the manufacturer or DHCP hints."""
     custom = {normalize_mac(k): v for k, v in (custom_names or {}).items() if v}
+    tv = snapshot.tv_macs
 
     def vendor_of(mac: str) -> str | None:
         if vendor_lookup is None or is_private_mac(mac):
@@ -484,14 +488,14 @@ def assign_names(
 
     for host in snapshot.hosts:
         host.vendor = vendor_of(host.mac)
-        host.name = custom.get(host.mac) or suggested_name(host)
+        host.name = custom.get(host.mac) or suggested_name(host, host.mac in tv)
     snapshot.names = {h.mac: h.name for h in snapshot.hosts}
     snapshot.vendors = {h.mac: h.vendor for h in snapshot.hosts if h.vendor}
 
     def fallback(mac: str) -> str:
         stray = Host(mac, mac.upper(), None, False, None, None, private=is_private_mac(mac))
         stray.vendor = vendor_of(mac)
-        return custom.get(mac) or suggested_name(stray)
+        return custom.get(mac) or suggested_name(stray, mac in tv)
 
     snapshot.namer = fallback
 
@@ -508,6 +512,7 @@ class WifiClient:
     bytes_down: int | None = None  # hub -> device
     bytes_up: int | None = None  # device -> hub
     connected_since: str | None = None  # ISO 8601 with offset, as the hub reports it
+    tv: bool = False  # on the hub's hidden IPTV network, so a TV receiver
 
 
 @dataclass(slots=True)
@@ -544,6 +549,13 @@ class SlowSnapshot:
 
     def host(self, mac: str) -> Host | None:
         return next((h for h in self.hosts if h.mac == mac), None)
+
+    @property
+    def tv_macs(self) -> set[str]:
+        """TV receivers: anything on the IPTV network, or that the hub calls a set-top box."""
+        return {c.mac for c in self.wifi_clients if c.tv} | {
+            h.mac for h in self.hosts if (h.device_type or "").upper() == "STB"
+        }
 
     def clients_on(self, band: str) -> list[WifiClient]:
         return [c for c in self.wifi_clients if c.band == band]
@@ -586,13 +598,14 @@ def parse_hosts(raw: Any) -> list[Host]:
                 port=_port_from_ref(host.get("layer1_interface")),
                 hub_name=hub_name,
                 vendor_class=host.get("vendor_class_id") or None,
+                device_type=host.get("detected_device_type") or None,
                 private=is_private_mac(mac),
             )
         )
     return result
 
 
-def parse_wifi_clients(raw: Any, band: str) -> list[WifiClient]:
+def parse_wifi_clients(raw: Any, band: str, tv: bool = False) -> list[WifiClient]:
     """AssociatedDevices of one access point. The table keeps history, so filter on Active."""
     devices = _unwrap(raw, "associated_device")
     if isinstance(devices, dict):
@@ -616,6 +629,7 @@ def parse_wifi_clients(raw: Any, band: str) -> list[WifiClient]:
                 bytes_down=_int(stats.get("bytes_sent")),
                 bytes_up=_int(stats.get("bytes_received")),
                 connected_since=device.get("association_time") or None,
+                tv=tv,
             )
         )
     return result
@@ -721,11 +735,15 @@ def parse_speed_test(raw: Any) -> tuple[SpeedTestResult | None, str | None]:
     return result, state
 
 
-def parse_slow(raw: dict[str, Any], access_points: dict[int, str]) -> SlowSnapshot:
+def parse_slow(
+    raw: dict[str, Any],
+    access_points: dict[int, str],
+    tv_access_points: frozenset[int] = frozenset(),
+) -> SlowSnapshot:
     hosts = parse_hosts(raw.get("hosts"))
     clients: list[WifiClient] = []
     for uid, band in access_points.items():
-        clients.extend(parse_wifi_clients(raw.get(f"ap_{uid}"), band))
+        clients.extend(parse_wifi_clients(raw.get(f"ap_{uid}"), band, uid in tv_access_points))
     speed_test, state = parse_speed_test(raw.get("speed_test"))
     return SlowSnapshot(
         hosts=hosts,
@@ -768,3 +786,15 @@ def find_access_points(raw: Any) -> dict[int, str]:
         if uid is not None and band and ssid.get("enable"):
             result[uid] = band
     return result
+
+
+def find_tv_access_points(raw: Any) -> frozenset[int]:
+    """The hidden network Bell's wireless TV receivers join (alias WL_IPTV_5G on the 5690)."""
+    ssids = _unwrap(raw, "ssid")
+    if isinstance(ssids, dict):
+        ssids = [ssids]
+    return frozenset(
+        uid
+        for ssid in ssids or []
+        if (uid := _int(ssid.get("uid"))) is not None and "IPTV" in str(ssid.get("alias") or "").upper()
+    )

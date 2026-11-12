@@ -167,6 +167,9 @@
       "wired_devices": {
         "name": "Wired devices"
       },
+      "tv_receivers": {
+        "name": "TV receivers"
+      },
       "wifi_devices": {
         "name": "Wi-Fi devices"
       },

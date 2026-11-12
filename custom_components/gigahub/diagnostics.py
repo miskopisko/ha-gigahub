@@ -37,6 +37,7 @@ async def async_get_config_entry_diagnostics(
                 "product_class": runtime.identity.product_class,
                 "firmware": runtime.identity.firmware,
                 "access_points": runtime.identity.access_points,
+                "tv_access_points": sorted(runtime.identity.tv_access_points),
             },
             "fast": {"snapshot": asdict(fast.snapshot), "rates": fast.rates} if fast else None,
             "slow": {

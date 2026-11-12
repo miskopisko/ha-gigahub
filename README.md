@@ -47,8 +47,10 @@ what the hub's own speed test says your line can do, and how well every Wi-Fi cl
 
 **Devices and hub**
 - Devices connected, wired, Wi-Fi (names as attributes). *Wired devices* also lists each wired
-  device's IP address, LAN port, port link speed and port traffic totals. Wired traffic is
-  counted per port, so devices behind a switch share their port's numbers
+  device's IP address, LAN port and the port's link speed
+- *TV receivers*: Bell TV boxes, found by the hub's hidden TV network or its set-top-box tag,
+  with band, signal, link rate and data since connecting as attributes. They're left out of the
+  Wi-Fi and wired lists, and named *TV receiver (…)* unless you name them yourself
 - Friendly device names: when the hub only knows a MAC address, the device is named after its
   manufacturer (from the MAC prefix), e.g. *Nintendo (12:34:56)*, or *Android device* / *Private
   address* when that's all there is to go on. You can name any device yourself (see Options).

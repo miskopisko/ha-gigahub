@@ -33,6 +33,7 @@ from .parse import (
     SlowSnapshot,
     find_access_points,
     find_ip_interface_uid,
+    find_tv_access_points,
     parse_fast,
     parse_slow,
     parse_speed_test,
@@ -55,6 +56,7 @@ class HubIdentity:
     firmware: str | None
     ip_data_uid: int | None
     access_points: dict[int, str]
+    tv_access_points: frozenset[int] = frozenset()
 
 
 def _wrap(err: Exception) -> Exception:
@@ -142,6 +144,7 @@ class GigaHubApi:
             firmware=raw.get("firmware") if isinstance(raw.get("firmware"), str) else None,
             ip_data_uid=find_ip_interface_uid(raw.get("ip_interfaces")),
             access_points=find_access_points(raw.get("ssids")),
+            tv_access_points=find_tv_access_points(raw.get("ssids")),
         )
         return self.identity
 
@@ -170,6 +173,7 @@ class GigaHubApi:
 
     async def fetch_slow(self) -> SlowSnapshot:
         access_points = self.identity.access_points if self.identity else {}
+        tv_access_points = self.identity.tv_access_points if self.identity else frozenset()
         xpaths = {
             "hosts": "Device/Hosts/Hosts",
             "speed_test": "Device/IP/Diagnostics/SpeedTest",
@@ -185,7 +189,7 @@ class GigaHubApi:
         hosts = xpaths.pop("hosts")
         raw = await self._call(lambda: self._client.get_values_by_xpaths({"hosts": hosts}))
         raw |= await self._call(lambda: self._client.get_values_by_xpaths(xpaths, ignore_unknown_paths=True))
-        return parse_slow(raw, access_points)
+        return parse_slow(raw, access_points, tv_access_points)
 
     async def raw(self, xpaths: dict[str, str]) -> dict[str, Any]:
         """Read arbitrary paths (used by diagnostics)."""

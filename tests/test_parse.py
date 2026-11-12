@@ -88,6 +88,7 @@ FAST_RAW = {
         },
         {
             "uid": 3,
+            "alias": "WL_IPTV_5G",
             "enable": True,
             "lower_layers": RADIO_5G,
             "stats": {"bytes_sent": "1000", "bytes_received": "10"},
@@ -288,6 +289,30 @@ def test_discovery() -> None:
     ip_interfaces = [{"uid": 1, "alias": "IP_BR_LAN"}, {"uid": 2, "alias": "IP_DATA"}]
     assert parse.find_ip_interface_uid(ip_interfaces) == 2
     assert parse.find_access_points(FAST_RAW["ssids"]) == {1: "2g4", 3: "5g", 4: "5g"}
+    assert parse.find_tv_access_points(FAST_RAW["ssids"]) == {3}
+
+
+def test_tv_receivers_found_by_iptv_network_and_set_top_box_type() -> None:
+    hosts = [
+        *HOSTS,
+        # A wired receiver the hub recognises as a set-top box.
+        {
+            "phys_address": "AA:AA:AA:00:00:05",
+            "active": True,
+            "interface_type": "Ethernet",
+            "layer1_interface": "Device/Ethernet/Interfaces/Interface[PHY2]",
+            "detected_device_type": "STB",
+        },
+    ]
+    iptv = [{"mac_address": "aa:aa:aa:00:00:04", "active": True, "signal_strength": -74}]
+    snap = parse.parse_slow(
+        {"hosts": hosts, "ap_3": iptv, "ap_4": ASSOC_5G}, {3: "5g", 4: "5g"}, frozenset({3})
+    )
+    assert snap.tv_macs == {"aa:aa:aa:00:00:04", "aa:aa:aa:00:00:05"}
+    assert [c.tv for c in snap.wifi_clients] == [True, False]
+    parse.assign_names(snap, None, None)
+    assert snap.name_for("aa:aa:aa:00:00:04") == "TV receiver (00:00:04)"
+    assert snap.name_for("aa:aa:aa:00:00:05") == "TV receiver (00:00:05)"
 
 
 def test_speed_test_status_field_used_by_5690() -> None:

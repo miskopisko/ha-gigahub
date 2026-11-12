@@ -349,21 +349,45 @@ sections:
           {%- set rows = state_attr('sensor.giga_hub_wired_devices', 'details') or [] -%}
           {%- if rows -%}
           <table width="100%">
-          <tr><th align="left">Device</th><th align="left">IP</th><th>Port</th><th align="right">Link</th><th align="right">Port total ↓ / ↑</th></tr>
+          <tr><th align="left">Device</th><th align="left">IP</th><th align="right">Link</th></tr>
           {%- for r in rows -%}
           {%- set l = r.link_mbps -%}
           <tr>
           <td>{{ r.name }}</td>
           <td>{{ r.ip or '' }}</td>
-          <td align="center">{{ r.port or '' }}</td>
           <td align="right">{{ '' if l is none else (('%g Gbps' % (l / 1000)) if l >= 1000 else (l ~ ' Mbps')) }}</td>
-          <td align="right">{{ '%.1f' % r.port_downloaded_gb if r.port_downloaded_gb is not none else '' }} / {{ '%.1f' % r.port_uploaded_gb if r.port_uploaded_gb is not none else '' }} GB</td>
           </tr>
           {%- endfor -%}
           </table>
-          <p><sub>Traffic is per LAN port, so devices behind a switch share their port's totals.</sub></p>
           {%- else -%}
           <p>No wired devices right now.</p>
+          {%- endif -%}
+        grid_options:
+          columns: full
+      - type: markdown
+        title: TV receivers
+        # Hidden for anyone without Bell TV boxes.
+        visibility:
+          - condition: numeric_state
+            entity: sensor.giga_hub_tv_receivers
+            above: 0
+        content: >-
+          {%- set rows = state_attr('sensor.giga_hub_tv_receivers', 'details') or [] -%}
+          {%- if rows -%}
+          <table width="100%">
+          <tr><th align="left">Receiver</th><th>Connection</th><th align="right">Signal</th><th align="right">Link ↓ / ↑</th><th align="right">Since connecting ↓ / ↑</th></tr>
+          {%- for r in rows -%}
+          {%- set s = r.signal_dbm -%}
+          <tr>
+          <td>{{ r.name }}</td>
+          <td align="center">{{ r.band if r.connection == 'Wi-Fi' else ('LAN port ' ~ r.port if r.port else 'Wired') }}</td>
+          <td align="right">{% if s is not none %}{{ s }} dBm {{ '🟢' if s >= -60 else ('🟡' if s >= -70 else '🔴') }}{% endif %}</td>
+          <td align="right">{% if r.link_down_mbps is not none %}{{ r.link_down_mbps }} / {{ r.link_up_mbps }} Mbps{% endif %}</td>
+          <td align="right">{% if r.downloaded_gb is not none %}{{ '%.1f' % r.downloaded_gb }} / {{ '%.2f' % r.uploaded_gb }} GB{% endif %}</td>
+          </tr>
+          {%- endfor -%}
+          </table>
+          <p><sub>Wireless receivers use the hub's hidden TV network, so they have no address on your home network.</sub></p>
           {%- endif -%}
         grid_options:
           columns: full

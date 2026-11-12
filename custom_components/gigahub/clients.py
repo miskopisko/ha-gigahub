@@ -26,7 +26,7 @@ from . import GigaHubConfigEntry
 from .const import CONF_DEVICE_NAMES, DOMAIN
 from .coordinator import GigaHubSlowCoordinator
 from .entity import hub_device_info
-from .parse import SlowSnapshot
+from .parse import Host, SlowSnapshot
 
 BAND_LABEL = {"2g4": "2.4 GHz", "5g": "5 GHz", "6g": "6 GHz"}
 BUSY_THRESHOLD_MBPS = 0.1
@@ -35,7 +35,10 @@ BUSY_THRESHOLD_MBPS = 0.1
 def traffic_rows(s: SlowSnapshot) -> list[dict[str, Any]]:
     """Every Wi-Fi device on the hub's radios, busiest first."""
     rows = []
+    tv = s.tv_macs
     for client in s.wifi_clients:
+        if client.mac in tv:
+            continue
         traffic = s.device_traffic.get(client.mac)
         host = s.host(client.mac)
         rows.append(
@@ -63,14 +66,17 @@ def _gb(value: int | None) -> float | None:
     return round(value / 1e9, 2) if value is not None else None
 
 
+def wired_hosts(s: SlowSnapshot) -> list[Host]:
+    """Wired devices, minus TV receivers (they get their own list)."""
+    tv = s.tv_macs
+    return [h for h in s.active_hosts if h.interface_type == "Ethernet" and h.mac not in tv]
+
+
 def wired_rows(s: SlowSnapshot) -> list[dict[str, Any]]:
-    """Every wired device, by LAN port. The hub only counts traffic per port, so
-    devices behind a switch share their port's numbers."""
+    """Every wired device with its IP and the link speed of the LAN port it's on."""
     ports = {p.number: p for p in s.ports}
     rows = []
-    for host in s.active_hosts:
-        if host.interface_type != "Ethernet":
-            continue
+    for host in wired_hosts(s):
         port = ports.get(host.port) if host.port is not None else None
         rows.append(
             {
@@ -80,12 +86,63 @@ def wired_rows(s: SlowSnapshot) -> list[dict[str, Any]]:
                 "vendor": host.vendor,
                 "port": host.port,
                 "link_mbps": port.speed_mbps if port else None,
-                # Port counters are from the hub's side: sent = to the device.
-                "port_downloaded_gb": _gb(port.bytes_sent) if port else None,
-                "port_uploaded_gb": _gb(port.bytes_received) if port else None,
             }
         )
-    rows.sort(key=lambda r: (r["port"] is None, r["port"] or 0, r["name"].lower()))
+    rows.sort(key=lambda r: r["name"].lower())
+    return rows
+
+
+def tv_rows(s: SlowSnapshot) -> list[dict[str, Any]]:
+    """TV receivers, on the hub's IPTV Wi-Fi or plugged into a LAN port."""
+    ports = {p.number: p for p in s.ports}
+    rows = []
+    tv = s.tv_macs
+    seen = set()
+    for client in s.wifi_clients:
+        if client.mac not in tv:
+            continue
+        seen.add(client.mac)
+        rows.append(
+            {
+                "name": s.name_for(client.mac),
+                "mac": client.mac.upper(),
+                "vendor": s.vendors.get(client.mac),
+                "connection": "Wi-Fi",
+                "band": BAND_LABEL.get(client.band, client.band),
+                "port": None,
+                "signal_dbm": client.signal_dbm,
+                "standard": client.standard,
+                "link_down_mbps": client.downlink_mbps,
+                "link_up_mbps": client.uplink_mbps,
+                "downloaded_gb": _gb(client.bytes_down),
+                "uploaded_gb": _gb(client.bytes_up),
+                "connected_since": client.connected_since,
+            }
+        )
+    for host in s.active_hosts:
+        if host.mac in seen or host.mac not in tv or host.interface_type != "Ethernet":
+            continue
+        port = ports.get(host.port) if host.port is not None else None
+        link = port.speed_mbps if port else None
+        rows.append(
+            {
+                "name": host.name,
+                "mac": host.mac.upper(),
+                "vendor": host.vendor,
+                "connection": "Wired",
+                "band": None,
+                "port": host.port,
+                "signal_dbm": None,
+                "standard": None,
+                "link_down_mbps": link,
+                "link_up_mbps": link,
+                # A port's counters cover everything on it, so leave these out.
+                "downloaded_gb": None,
+                "uploaded_gb": None,
+                "connected_since": None,
+            }
+        )
+    rows.sort(key=lambda r: r["name"].lower())
     return rows
 
 
