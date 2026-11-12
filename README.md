@@ -124,5 +124,9 @@ uvx pytest
 uvx ruff check .
 ```
 
+The integration icon is drawn in `assets/icon.svg` and exported to
+`custom_components/gigahub/brand/icon.png` (256 px) and `icon@2x.png` (512 px), which Home Assistant
+2026.3+ picks up on its own.
+
 Built on [python-sagemcom-api](https://github.com/imicknl/python-sagemcom-api). Not affiliated with
 Bell Canada or Sagemcom.
