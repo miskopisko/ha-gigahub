@@ -1,6 +1,6 @@
 # A "Network" dashboard view for the Bell Giga Hub integration.
-# Needs mini-graph-card (live graphs) and flex-table-card (sortable Wi-Fi devices table)
-# from the Marketplace; everything else is built in.
+# Needs mini-graph-card (live graphs) and flex-table-card (sortable device tables) from the
+# Marketplace; card-mod is optional (Wi-Fi traffic graph height). Everything else is built in.
 # Add it with: Dashboard > ⋮ > Edit > ⋮ > Raw configuration editor, and paste this under `views:`.
 title: Network
 path: network
@@ -246,40 +246,46 @@ sections:
         heading: Wi-Fi
         heading_style: title
         icon: mdi:wifi
-        badges:
-          - type: entity
-            entity: sensor.giga_hub_2_4_ghz_channel
-            name: 2.4 GHz ch
-            show_icon: false
-            state_content: [name, state, bandwidth]
-          - type: entity
-            entity: sensor.giga_hub_5_ghz_channel
-            name: 5 GHz ch
-            show_icon: false
-            state_content: [name, state, bandwidth]
-          - type: entity
-            entity: sensor.giga_hub_6_ghz_channel
-            name: 6 GHz ch
-            show_icon: false
-            state_content: [name, state, bandwidth]
-      - type: tile
-        entity: sensor.giga_hub_2_4_ghz_clients
-        name: 2.4 GHz
-      - type: tile
-        entity: sensor.giga_hub_5_ghz_clients
-        name: 5 GHz
-      - type: tile
-        entity: sensor.giga_hub_6_ghz_clients
-        name: 6 GHz
-      - type: tile
-        entity: sensor.giga_hub_wi_fi_devices_on_pods
-        name: On pods
+      # Counts on the left, traffic chart on the right. Phones get a full-width copy of
+      # the tiles instead, since the section is narrower there (both share one card list).
+      - type: vertical-stack
+        visibility:
+          - condition: screen
+            media_query: "(min-width: 768px)"
+        grid_options:
+          columns: 6
+        cards: &wifi_tiles
+          - type: tile
+            entity: sensor.giga_hub_2_4_ghz_clients
+            name: 2.4 GHz
+          - type: tile
+            entity: sensor.giga_hub_5_ghz_clients
+            name: 5 GHz
+          - type: tile
+            entity: sensor.giga_hub_6_ghz_clients
+            name: 6 GHz
+          - type: tile
+            entity: sensor.giga_hub_wi_fi_devices_on_pods
+            name: On pods
+          - type: tile
+            entity: sensor.giga_hub_busiest_wi_fi_device
+            name: Busiest Wi-Fi device
+      - type: vertical-stack
+        visibility:
+          - condition: screen
+            media_query: "(max-width: 767px)"
+        grid_options:
+          columns: full
+        cards: *wifi_tiles
       - type: custom:mini-graph-card
         name: Wi-Fi traffic to clients (6 h)
         hours_to_show: 6
         points_per_hour: 60
         line_width: 2
         smoothing: true
+        # Five rows tall to match the five tiles beside it. The graph scales with the card's
+        # width and sits at the bottom, so keep it short enough to fit on wide screens too.
+        height: 115
         show:
           fill: false
           legend: true
@@ -291,19 +297,20 @@ sections:
           - entity: sensor.giga_hub_6_ghz_download
             name: 6 GHz
         grid_options:
-          columns: full
-      - type: tile
-        entity: sensor.giga_hub_busiest_wi_fi_device
-        name: Busiest Wi-Fi device
-        grid_options:
-          columns: full
+          columns: 18
+          rows: 5
+        # Fill those five rows (needs card-mod; without it the card is just a bit shorter).
+        card_mod:
+          style: |
+            ha-card { height: 100%; }
       - type: custom:flex-table-card
         title: Wi-Fi devices
         # Click a header to sort; until then it's busiest first (last 5 minutes).
         # Devices on a pod aren't listed: the hub can't see them.
         # `this.raw_data[n]` reads column n of the same row (hidden columns count).
         # Number cells are Number objects with a display toString, so they sort as numbers;
-        # pod devices have no radio stats and show "—".
+        # pod devices have no radio stats and show "—". Signal's blank has a leading space so
+        # it sorts below "-77 dBm" (pods last when strongest is first).
         entities:
           include: sensor.giga_hub_busiest_wi_fi_device
         columns:
@@ -318,7 +325,7 @@ sections:
           - name: Signal
             data: devices.signal_dbm
             align: right
-            modify: "x == null ? '—' : Object.assign(new Number(x), {toString: () => x + ' dBm ' + (x >= -60 ? '🟢' : x >= -70 ? '🟡' : '🔴')})"
+            modify: "x == null ? ' —' : Object.assign(new Number(x), {toString: () => x + '<span class=unit> dBm</span> ' + (x >= -60 ? '🟢' : x >= -70 ? '🟡' : '🔴')})"
           - name: Wi-Fi
             data: devices.standard
             align: center
@@ -340,6 +347,14 @@ sections:
             modify: "x ?? ''"
         css:
           table+: "padding-top: 0;"
+          ha-card: "container-type: inline-size;"
+          # Narrow cards (phones, one-column sections): drop IP, Wi-Fi and Link, tighten the spacing, and show signal without "dBm".
+          "@container (max-width: 600px)": >-
+            table { padding: 0 4px 8px; font-size: 13px; }
+            th, tr td { padding-left: 0.3em; padding-right: 0.3em; }
+            th:nth-child(2), td:nth-child(2), th:nth-child(5), td:nth-child(5),
+            th:nth-child(6), td:nth-child(6) { display: none; }
+            .unit { display: none; }
         grid_options:
           columns: full
 
@@ -370,68 +385,114 @@ sections:
             name: Wired
         grid_options:
           columns: full
-      - type: markdown
+      - type: custom:flex-table-card
         title: Wired devices
-        content: >-
-          {%- set rows = state_attr('sensor.giga_hub_wired_devices', 'details') or [] -%}
-          {%- if rows -%}
-          <table width="100%">
-          <tr><th align="left">Device</th><th align="left">IP</th><th align="right">Link</th></tr>
-          {%- for r in rows -%}
-          {%- set l = r.link_mbps -%}
-          <tr>
-          <td>{{ r.name }}</td>
-          <td>{{ r.ip or '' }}</td>
-          <td align="right">{{ '' if l is none else (('%g Gbps' % (l / 1000)) if l >= 1000 else (l ~ ' Mbps')) }}</td>
-          </tr>
-          {%- endfor -%}
-          </table>
-          {%- else -%}
-          <p>No wired devices right now.</p>
-          {%- endif -%}
+        entities:
+          include: sensor.giga_hub_wired_devices
+        columns:
+          - name: Device
+            data: details.name
+          - name: IP
+            data: details.ip
+            modify: "x || '—'"
+          - name: Link
+            data: details.link_mbps
+            align: right
+            modify: "x == null ? '—' : Object.assign(new Number(x), {toString: () => x >= 1000 ? x / 1000 + ' Gbps' : x + ' Mbps'})"
+        css:
+          table+: "padding-top: 0;"
+          ha-card: "container-type: inline-size;"
+          "@container (max-width: 600px)": >-
+            table { padding: 0 4px 8px; font-size: 13px; }
+            th, tr td { padding-left: 0.3em; padding-right: 0.3em; }
         grid_options:
           columns: full
-      - type: markdown
+      - type: custom:flex-table-card
         title: TV receivers
-        # Hidden for anyone without Bell TV boxes.
+        # Hidden for anyone without Bell TV boxes. Wireless receivers use the hub's hidden
+        # TV network, so they have no address on the home network (no IP column).
         visibility:
           - condition: numeric_state
             entity: sensor.giga_hub_tv_receivers
             above: 0
-        content: >-
-          {%- set rows = state_attr('sensor.giga_hub_tv_receivers', 'details') or [] -%}
-          {%- if rows -%}
-          <table width="100%">
-          <tr><th align="left">Receiver</th><th>Connection</th><th align="right">Signal</th><th align="right">Link ↓ / ↑</th><th align="right">Since connecting ↓ / ↑</th></tr>
-          {%- for r in rows -%}
-          {%- set s = r.signal_dbm -%}
-          <tr>
-          <td>{{ r.name }}</td>
-          <td align="center">{{ r.band if r.connection == 'Wi-Fi' else ('LAN port ' ~ r.port if r.port else 'Wired') }}</td>
-          <td align="right">{% if s is not none %}{{ s }} dBm {{ '🟢' if s >= -60 else ('🟡' if s >= -70 else '🔴') }}{% endif %}</td>
-          <td align="right">{% if r.link_down_mbps is not none %}{{ r.link_down_mbps }} / {{ r.link_up_mbps }} Mbps{% endif %}</td>
-          <td align="right">{% if r.downloaded_gb is not none %}{{ '%.1f' % r.downloaded_gb }} / {{ '%.2f' % r.uploaded_gb }} GB{% endif %}</td>
-          </tr>
-          {%- endfor -%}
-          </table>
-          <p><sub>Wireless receivers use the hub's hidden TV network, so they have no address on your home network.</sub></p>
-          {%- endif -%}
+        entities:
+          include: sensor.giga_hub_tv_receivers
+        columns:
+          - name: Receiver
+            data: details.name
+          - name: Connection
+            data: details.connection
+            align: center
+            modify: "x == 'Wi-Fi' ? this.raw_data[5] : (this.raw_data[6] ? 'LAN port ' + this.raw_data[6] : 'Wired')"
+          - name: Signal
+            data: details.signal_dbm
+            align: right
+            modify: "x == null ? ' —' : Object.assign(new Number(x), {toString: () => x + '<span class=unit> dBm</span> ' + (x >= -60 ? '🟢' : x >= -70 ? '🟡' : '🔴')})"
+          - name: Link ↓ / ↑
+            data: details.link_down_mbps
+            align: right
+            modify: "x == null ? '—' : Object.assign(new Number(x), {toString: () => x + ' / ' + this.raw_data[7] + ' Mbps'})"
+          - name: Since connecting ↓ / ↑
+            data: details.downloaded_gb
+            align: right
+            modify: "x == null ? '—' : Object.assign(new Number(x), {toString: () => x.toFixed(1) + ' / ' + (this.raw_data[8] ?? 0).toFixed(2) + ' GB'})"
+          # Hidden cells must have a value, or flex-table-card draws them anyway.
+          - data: details.band
+            hidden: true
+            modify: "x ?? ''"
+          - data: details.port
+            hidden: true
+            modify: "x ?? ''"
+          - data: details.link_up_mbps
+            hidden: true
+            modify: "x ?? ''"
+          - data: details.uploaded_gb
+            hidden: true
+            modify: "x ?? ''"
+        css:
+          table+: "padding-top: 0;"
+          ha-card: "container-type: inline-size;"
+          # Narrow cards (phones, one-column sections): drop Link and show signal without "dBm".
+          "@container (max-width: 600px)": >-
+            table { padding: 0 4px 8px; font-size: 13px; }
+            th, tr td { padding-left: 0.3em; padding-right: 0.3em; }
+            th:nth-child(4), td:nth-child(4) { display: none; }
+            .unit { display: none; }
         grid_options:
           columns: full
-      - type: markdown
+      - type: custom:flex-table-card
         title: New devices
-        content: >-
-          {%- set recent = state_attr('sensor.giga_hub_newest_device', 'recent') or [] -%}
-          {%- if recent -%}
-          <table width="100%">
-          <tr><th align="left">When</th><th align="left">Device</th><th align="left">Maker</th><th>Via</th></tr>
-          {%- for d in recent[:10] -%}
-          <tr><td>{{ as_timestamp(d.time) | timestamp_custom('%b %-d, %-I:%M %p') }}</td><td>{{ d.name }}</td><td>{{ d.vendor or '' }}</td><td align="center">{{ d.connection or '' }}</td></tr>
-          {%- endfor -%}
-          </table>
-          {%- else -%}
-          <p>No new devices yet. Anything the hub has never seen before will show up here.</p>
-          {%- endif -%}
+        # Newest first; anything the hub has never seen before shows up here.
+        # Hidden until the first one arrives.
+        visibility:
+          - condition: state
+            entity: sensor.giga_hub_newest_device
+            state_not: [unknown, unavailable]
+        max_rows: 10
+        entities:
+          include: sensor.giga_hub_newest_device
+        columns:
+          - name: When
+            data: recent.time
+            sort_unmodified: true
+            modify: "new Date(x).toLocaleString(undefined, {month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'})"
+          - name: Device
+            data: recent.name
+          - name: Maker
+            data: recent.vendor
+            modify: "x || '—'"
+          - name: Via
+            data: recent.connection
+            align: center
+            modify: "x || '—'"
+        css:
+          table+: "padding-top: 0;"
+          ha-card: "container-type: inline-size;"
+          # Narrow cards (phones, one-column sections): drop Maker.
+          "@container (max-width: 600px)": >-
+            table { padding: 0 4px 8px; font-size: 13px; }
+            th, tr td { padding-left: 0.3em; padding-right: 0.3em; }
+            th:nth-child(3), td:nth-child(3) { display: none; }
         grid_options:
           columns: full
 

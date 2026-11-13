@@ -91,11 +91,14 @@ here. Leave the name empty to go back to the automatic name.
 ## Dashboard
 
 [`dashboards/network.yaml`](dashboards/network.yaml) is a ready-made **Network** view: live speed
-graphs, daily and monthly usage bars, speed-test history, fibre trend, a sortable table of Wi-Fi
-devices with signal quality, device counts and a log of new devices. It uses
+graphs, daily and monthly usage bars, speed-test history, fibre trend, sortable tables of Wi-Fi,
+wired and TV devices, device counts and a log of new devices. The tables drop their less important
+columns when the card is narrow (phones, one-column layouts). It uses
 [mini-graph-card](https://github.com/kalkih/mini-graph-card) for the live graphs and
-[flex-table-card](https://github.com/custom-cards/flex-table-card) for the Wi-Fi devices table
-(click a column header to sort). Install both from the Marketplace first.
+[flex-table-card](https://github.com/custom-cards/flex-table-card) for the tables (click a column
+header to sort). Install both from the Marketplace first.
+[card-mod](https://github.com/thomasloven/lovelace-card-mod) is optional: with it, the Wi-Fi traffic
+graph stretches to match the height of the tiles beside it.
 
 To add it: open a dashboard, **Edit → ⋮ → Raw configuration editor**, and paste the file's contents
 as a new item under `views:`.

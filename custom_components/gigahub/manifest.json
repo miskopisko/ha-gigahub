@@ -10,5 +10,5 @@
   "issue_tracker": "https://github.com/miskopisko/ha-gigahub/issues",
   "loggers": ["sagemcom_api", "aiooui"],
   "requirements": ["sagemcom_api==1.6.0", "aiooui>=0.1.9"],
-  "version": "0.6.1"
+  "version": "0.6.2"
 }
