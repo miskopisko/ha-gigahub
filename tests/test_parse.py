@@ -267,6 +267,32 @@ def test_slow_snapshot() -> None:
     assert snap.firmware == "2.14.2" and snap.reboot_count == 29
 
 
+def test_stale_host_ips_give_way_to_dhcp_leases() -> None:
+    hosts = [
+        # Holds the lease on .20.
+        {"phys_address": "AA:AA:AA:00:00:01", "ip_address": "192.168.2.20", "active": True},
+        # Host table says .20 too (stale): it has no lease, so it loses the IP.
+        {"phys_address": "AA:AA:AA:00:00:02", "ip_address": "192.168.2.20", "active": True},
+        # Host table says .21, but its active lease says .22.
+        {"phys_address": "AA:AA:AA:00:00:03", "ip_address": "192.168.2.21", "active": True},
+        # Fixed IP set on the device, no lease, no clash: kept.
+        {"phys_address": "AA:AA:AA:00:00:04", "ip_address": "192.168.2.50", "active": True},
+    ]
+    leases = [
+        {"chaddr": "AA:AA:AA:00:00:01", "active": True, "i_pv4_addresses": [{"ip_address": "192.168.2.20"}]},
+        {"chaddr": "AA:AA:AA:00:00:03", "active": True, "i_pv4_addresses": [{"ip_address": "192.168.2.22"}]},
+        # An expired lease counts for nothing.
+        {"chaddr": "AA:AA:AA:00:00:02", "active": False, "i_pv4_addresses": [{"ip_address": "192.168.2.9"}]},
+    ]
+    snap = parse.parse_slow({"hosts": hosts, "dhcp_leases": leases}, {})
+    assert [h.ip for h in snap.hosts] == ["192.168.2.20", None, "192.168.2.22", "192.168.2.50"]
+
+
+def test_no_lease_table_leaves_ips_alone() -> None:
+    snap = parse.parse_slow({"hosts": HOSTS}, {})
+    assert snap.host("aa:aa:aa:00:00:02").ip == "192.168.2.11"
+
+
 def test_speed_test_picks_newest_by_timestamp() -> None:
     result, state = parse.parse_speed_test(SPEED_TEST)
     assert state == "COMPLETE"

@@ -331,10 +331,13 @@ sections:
             data: devices.downloaded_gb
             align: right
             modify: "x == null ? '—' : Object.assign(new Number(x), {toString: () => x.toFixed(1) + ' / ' + (this.raw_data[8] ?? 0).toFixed(2) + ' GB'})"
+          # Hidden cells must have a value, or flex-table-card draws them anyway.
           - data: devices.link_up_mbps
             hidden: true
+            modify: "x ?? ''"
           - data: devices.uploaded_gb
             hidden: true
+            modify: "x ?? ''"
         css:
           table+: "padding-top: 0;"
         grid_options:

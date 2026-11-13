@@ -180,6 +180,7 @@ class GigaHubApi:
             "firmware": "Device/DeviceInfo/SoftwareVersion",
             "reboot_count": "Device/DeviceInfo/RebootCount",
             "ports": "Device/Ethernet/Interfaces",
+            "dhcp_leases": "Device/DHCPv4/Server/Pools/Pool[@uid='1']/Clients",
         }
         for uid in access_points:
             xpaths[f"ap_{uid}"] = f"Device/WiFi/AccessPoints/AccessPoint[@uid='{uid}']/AssociatedDevices"

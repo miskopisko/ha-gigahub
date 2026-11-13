@@ -735,12 +735,50 @@ def parse_speed_test(raw: Any) -> tuple[SpeedTestResult | None, str | None]:
     return result, state
 
 
+def parse_dhcp_leases(raw: Any) -> dict[str, str]:
+    """MAC -> IP for every active DHCP lease."""
+    clients = _unwrap(raw, "client")
+    if isinstance(clients, dict):
+        clients = [clients]
+    leases: dict[str, str] = {}
+    for client in clients or []:
+        if not isinstance(client, dict) or not client.get("active"):
+            continue
+        mac = (client.get("chaddr") or "").lower()
+        addresses = _unwrap(client.get("i_pv4_addresses"), "i_pv4_address")
+        if isinstance(addresses, dict):
+            addresses = [addresses]
+        ip = next((a.get("ip_address") for a in addresses or [] if a.get("ip_address")), None)
+        if mac and ip:
+            leases[mac] = ip
+    return leases
+
+
+def fix_stale_ips(hosts: list[Host], leases: dict[str, str]) -> None:
+    """Prefer each device's active DHCP lease over the host table's IP.
+
+    The host table can keep an old IP for a device it no longer sees directly (devices
+    on a pod, or a phone whose lease expired), even after that IP was leased to
+    something else. Without a lease of its own, a device keeps its IP only if no other
+    device holds a lease on it. Devices with a fixed IP set on the device keep theirs.
+    """
+    if not leases:
+        return
+    leased_to = {ip: mac for mac, ip in leases.items()}
+    for host in hosts:
+        if host.mac in leases:
+            host.ip = leases[host.mac]
+        elif host.ip and leased_to.get(host.ip, host.mac) != host.mac:
+            host.ip = None
+
+
 def parse_slow(
     raw: dict[str, Any],
     access_points: dict[int, str],
     tv_access_points: frozenset[int] = frozenset(),
 ) -> SlowSnapshot:
     hosts = parse_hosts(raw.get("hosts"))
+    fix_stale_ips(hosts, parse_dhcp_leases(raw.get("dhcp_leases")))
     clients: list[WifiClient] = []
     for uid, band in access_points.items():
         clients.extend(parse_wifi_clients(raw.get(f"ap_{uid}"), band, uid in tv_access_points))
