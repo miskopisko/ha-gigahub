@@ -39,11 +39,12 @@ what the hub's own speed test says your line can do, and how well every Wi-Fi cl
 **Per-device Wi-Fi traffic**
 - *Busiest Wi-Fi device*: the device using the most right now; its attributes list every Wi-Fi
   device on the hub's radios with IP address, download/upload speed (5-minute averages), data used
-  since it connected, band and signal
+  since it connected, band and signal. Devices on a Bell Wi-Fi pod come last, with name and IP
+  only: their signal and traffic stay in Plume's cloud, not on the hub
 - For every Wi-Fi device you name (see Options): its own device in Home Assistant with download and
   upload speed, data downloaded / uploaded (running totals that survive reconnects and restarts, so
   they get daily and monthly statistics) and Wi-Fi signal
-- Devices connected through a Bell Wi-Fi pod aren't included: the hub doesn't count their traffic
+- Devices connected through a Bell Wi-Fi pod don't get traffic sensors: the hub doesn't count their traffic
 
 **Devices and hub**
 - Devices connected, wired, Wi-Fi (names as attributes). *Wired devices* also lists each wired
@@ -90,9 +91,11 @@ here. Leave the name empty to go back to the automatic name.
 ## Dashboard
 
 [`dashboards/network.yaml`](dashboards/network.yaml) is a ready-made **Network** view: live speed
-graphs, daily and monthly usage bars, speed-test history, fibre trend, a per-band table of Wi-Fi
-clients with signal quality, device counts and a log of new devices. It uses
-[mini-graph-card](https://github.com/kalkih/mini-graph-card) for the live graphs.
+graphs, daily and monthly usage bars, speed-test history, fibre trend, a sortable table of Wi-Fi
+devices with signal quality, device counts and a log of new devices. It uses
+[mini-graph-card](https://github.com/kalkih/mini-graph-card) for the live graphs and
+[flex-table-card](https://github.com/custom-cards/flex-table-card) for the Wi-Fi devices table
+(click a column header to sort). Install both from the Marketplace first.
 
 To add it: open a dashboard, **Edit → ⋮ → Raw configuration editor**, and paste the file's contents
 as a new item under `views:`.

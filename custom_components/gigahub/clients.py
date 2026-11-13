@@ -62,6 +62,44 @@ def traffic_rows(s: SlowSnapshot) -> list[dict[str, Any]]:
     return rows
 
 
+def pod_hosts(s: SlowSnapshot) -> list[Host]:
+    """Wi-Fi devices the hub knows about that aren't on its own radios, so they're on a pod."""
+    on_hub = {c.mac for c in s.wifi_clients}
+    tv = s.tv_macs
+    return [
+        h
+        for h in s.active_hosts
+        if h.interface_type == "WiFi"
+        and h.mac not in on_hub
+        and h.mac not in tv
+        and "pod" not in h.name.lower()
+    ]
+
+
+def pod_rows(s: SlowSnapshot) -> list[dict[str, Any]]:
+    """Devices on a pod, by name. The pod's radio stats live in Plume's cloud, not the hub."""
+    rows = [
+        {
+            "name": s.name_for(h.mac),
+            "mac": h.mac.upper(),
+            "ip": h.ip,
+            "band": "Pod",
+            "signal_dbm": None,
+            "standard": None,
+            "link_down_mbps": None,
+            "link_up_mbps": None,
+            "download_mbps": None,
+            "upload_mbps": None,
+            "downloaded_gb": None,
+            "uploaded_gb": None,
+            "connected_since": None,
+        }
+        for h in pod_hosts(s)
+    ]
+    rows.sort(key=lambda r: r["name"].lower())
+    return rows
+
+
 def _gb(value: int | None) -> float | None:
     return round(value / 1e9, 2) if value is not None else None
 
@@ -147,7 +185,10 @@ def tv_rows(s: SlowSnapshot) -> list[dict[str, Any]]:
 
 
 class GigaHubBusiestDevice(CoordinatorEntity[GigaHubSlowCoordinator], SensorEntity):
-    """State: the busiest Wi-Fi device right now. Attributes: all of them, by traffic."""
+    """State: the busiest Wi-Fi device right now.
+
+    Attributes: every device on the hub's radios by traffic, then devices on pods by name.
+    """
 
     _attr_has_entity_name = True
     _attr_translation_key = "busiest_wifi_device"
@@ -169,7 +210,8 @@ class GigaHubBusiestDevice(CoordinatorEntity[GigaHubSlowCoordinator], SensorEnti
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
-        return {"devices": traffic_rows(self.coordinator.data)}
+        data = self.coordinator.data
+        return {"devices": traffic_rows(data) + pod_rows(data)}
 
 
 class GigaHubNewestDevice(CoordinatorEntity[GigaHubSlowCoordinator], SensorEntity):

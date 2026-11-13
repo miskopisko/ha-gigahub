@@ -30,7 +30,7 @@ from homeassistant.helpers.typing import StateType
 from homeassistant.util import dt as dt_util
 
 from . import GigaHubConfigEntry
-from .clients import client_entities, tv_rows, wired_hosts, wired_rows
+from .clients import client_entities, pod_hosts, tv_rows, wired_hosts, wired_rows
 from .const import BANDS
 from .coordinator import FastData, GigaHubFastCoordinator, GigaHubSlowCoordinator
 from .entity import GigaHubEntity
@@ -234,19 +234,6 @@ def _names(s: SlowSnapshot, hosts) -> list[str]:
     return sorted((h.name for h in hosts), key=str.lower)
 
 
-def _hub_radio_macs(s: SlowSnapshot) -> set[str]:
-    return {c.mac for c in s.wifi_clients}
-
-
-def _pod_clients(s: SlowSnapshot):
-    on_hub = _hub_radio_macs(s)
-    return [
-        h
-        for h in s.active_hosts
-        if h.interface_type == "WiFi" and h.mac not in on_hub and "pod" not in h.name.lower()
-    ]
-
-
 DEVICES: tuple[SlowSensorDescription, ...] = (
     SlowSensorDescription(
         key="devices_connected",
@@ -280,8 +267,8 @@ DEVICES: tuple[SlowSensorDescription, ...] = (
         key="wifi_pod_clients",
         translation_key="wifi_pod_clients",
         state_class=SensorStateClass.MEASUREMENT,
-        value_fn=lambda s: len(_pod_clients(s)),
-        attrs_fn=lambda s: {"devices": _names(s, _pod_clients(s))},
+        value_fn=lambda s: len(pod_hosts(s)),
+        attrs_fn=lambda s: {"devices": _names(s, pod_hosts(s))},
     ),
 )
 
