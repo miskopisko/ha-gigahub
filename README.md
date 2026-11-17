@@ -21,8 +21,8 @@ what the hub's own speed test says your line can do, and how well every Wi-Fi cl
 **Speed test**
 - A *Run speed test* button that starts the hub's built-in test against Bell's servers. It measures
   the fibre line itself, so it isn't capped by a 1 Gbit/s LAN port the way a test from a computer is.
-- Optional automatic tests every N hours, so it can replace the Speedtest.net integration for
-  tracking your line over time
+- Run it on a schedule with an automation (see [Scheduling speed tests](#scheduling-speed-tests)),
+  so it can replace the Speedtest.net integration for tracking your line over time
 - Download, upload, latency and last-run sensors (the last result is picked up even if the test was
   started from the hub's web page), plus a *Speed test running* sensor
 
@@ -85,7 +85,6 @@ here. Leave the name empty to go back to the automatic name.
 |---|---|---|
 | Traffic and fibre polling interval | 30 s | Speeds are averaged over this window. One small request. |
 | Device list polling interval | 300 s | The device list is the hub's heaviest request (a few hundred KB), so it's polled less often. |
-| Run a speed test every | 0 h (off) | Automatic speed tests. The first one runs one interval after Home Assistant starts. |
 | Pause other traffic during speed tests | off | More accurate result; everything else on the network stalls for ~30 s. |
 
 ## Dashboard
@@ -124,18 +123,27 @@ actions:
         joined over {{ trigger.to_state.attributes.connection }}.
 ```
 
-For tests every N hours, use the *Run a speed test every* option instead. To run one at a fixed
-time, say 4 a.m.:
+### Scheduling speed tests
+
+The integration doesn't run tests on its own; an automation that presses the *Run speed test*
+button gives you full control over when. Tests at fixed times line up nicely on graphs. Four a day,
+at midnight, 6 a.m., noon and 6 p.m.:
 
 ```yaml
+alias: Giga Hub speed tests
 triggers:
   - trigger: time
-    at: "04:00:00"
+    at: ["00:00:00", "06:00:00", "12:00:00", "18:00:00"]
 actions:
   - action: button.press
     target:
       entity_id: button.giga_hub_run_speed_test
+    continue_on_error: true
 ```
+
+Each test fills the line for about 30 seconds. Because the automation presses the button, the
+test's traffic is left out of the data totals. Add conditions to skip tests when they'd get in the
+way, for example while someone is gaming or on a video call.
 
 ## Good to know
 
@@ -150,8 +158,8 @@ actions:
   private (randomised) Wi-Fi addresses can show up as new when they rotate their address.
 - **Speed-test traffic is left out of the data totals, but only for tests this integration
   starts.** The hub counts its own speed test oddly: each test adds roughly 7 GB of *upload* to the
-  internet counters but only a fraction of the download. Tests started from the button or the
-  automatic schedule are subtracted from *Data downloaded / uploaded* and the live speed graphs.
+  internet counters but only a fraction of the download. Tests started from the button (by hand or
+  from an automation) are subtracted from *Data downloaded / uploaded* and the live speed graphs.
   Tests started from the hub's own web page aren't, so each of those adds about 7 GB to the upload
   total.
 - **Counters reset when the hub reboots.** The data totals are `total_increasing`, so Home

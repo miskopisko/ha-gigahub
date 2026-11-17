@@ -1,17 +1,14 @@
-"""Runs the hub's speed test, from the button or on a schedule."""
+"""Runs the hub's speed test from the button. Schedule tests with an automation that presses it."""
 
 from __future__ import annotations
 
 import asyncio
-import logging
 from collections.abc import Callable
 
 from homeassistant.core import CALLBACK_TYPE, HomeAssistant, callback
 
 from .api import GigaHubApi
 from .coordinator import GigaHubFastCoordinator, GigaHubSlowCoordinator
-
-_LOGGER = logging.getLogger(__name__)
 
 # The hub's internet counters land in batches up to ~25 s late; keep excluding until the
 # test's last bytes have been counted.
@@ -70,11 +67,3 @@ class SpeedTestRunner:
             self._set_running(False)
         await self._slow.async_request_refresh()
         return True
-
-    async def async_run_scheduled(self, *_args) -> None:
-        """Entry point for the timer: log failures instead of raising."""
-        try:
-            if not await self.async_run():
-                _LOGGER.debug("Skipping scheduled speed test: one is already running")
-        except Exception as err:  # a failed scheduled test must not kill the timer
-            _LOGGER.warning("Scheduled speed test failed: %s", err)
