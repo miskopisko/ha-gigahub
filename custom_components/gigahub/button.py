@@ -1,4 +1,4 @@
-"""Buttons for the Giga Hub integration: run a speed test, reboot."""
+"""Buttons for the Giga Hub integration: run a speed test, clear the new-devices list, reboot."""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from .entity import GigaHubEntity
 PARALLEL_UPDATES = 1
 
 SPEED_TEST = ButtonEntityDescription(key="run_speed_test", translation_key="run_speed_test")
+CLEAR_NEW_DEVICES = ButtonEntityDescription(key="clear_new_devices", translation_key="clear_new_devices")
 REBOOT = ButtonEntityDescription(
     key="reboot",
     device_class=ButtonDeviceClass.RESTART,
@@ -50,6 +51,16 @@ class GigaHubSpeedTestButton(GigaHubEntity[GigaHubSlowCoordinator], ButtonEntity
             ) from err
 
 
+class GigaHubClearNewDevicesButton(GigaHubEntity[GigaHubSlowCoordinator], ButtonEntity):
+    """Empties the "Newest device" list (it also clears itself after a week)."""
+
+    def __init__(self, coordinator, entry: GigaHubConfigEntry) -> None:
+        super().__init__(coordinator, entry, CLEAR_NEW_DEVICES)
+
+    async def async_press(self) -> None:
+        await self.coordinator.async_clear_recent_new_devices()
+
+
 class GigaHubRebootButton(GigaHubEntity[GigaHubSlowCoordinator], ButtonEntity):
     def __init__(self, coordinator, entry: GigaHubConfigEntry) -> None:
         super().__init__(coordinator, entry, REBOOT)
@@ -72,4 +83,10 @@ async def async_setup_entry(
     async_add_entities: AddConfigEntryEntitiesCallback,
 ) -> None:
     slow = entry.runtime_data.slow
-    async_add_entities([GigaHubSpeedTestButton(slow, entry), GigaHubRebootButton(slow, entry)])
+    async_add_entities(
+        [
+            GigaHubSpeedTestButton(slow, entry),
+            GigaHubClearNewDevicesButton(slow, entry),
+            GigaHubRebootButton(slow, entry),
+        ]
+    )

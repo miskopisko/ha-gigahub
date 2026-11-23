@@ -35,6 +35,9 @@ what the hub's own speed test says your line can do, and how well every Wi-Fi cl
 - Client count, with every client's signal, standard and link rates as attributes
 - Weakest client signal, so you can see which device needs a better spot
 - Wi-Fi devices on pods: Wi-Fi devices the hub knows about that aren't on its own radios
+  - With a pod plugged into a LAN port (wired backhaul), the hub reports devices that join the pod
+    as wired on that port. They're counted as Wi-Fi devices on the pod instead, so don't plug
+    wired devices into the pod's spare port: they'd be listed under the pod too
 
 **Per-device Wi-Fi traffic**
 - *Busiest Wi-Fi device*: the device using the most right now; its attributes list every Wi-Fi
@@ -57,7 +60,8 @@ what the hub's own speed test says your line can do, and how well every Wi-Fi cl
   address* when that's all there is to go on. You can name any device yourself (see Options).
 - A *New device* event entity that fires when a device the hub has never seen joins, and a
   *Newest device* sensor that keeps the last 25 arrivals (time, name, maker, connection, IP)
-- LAN port link speed and traffic per port (unused ports are added disabled)
+  from the past week. A *Clear new devices* button empties the list sooner
+- LAN port link speed for every port, and traffic per port (traffic for unused ports is added disabled)
 - Last boot, memory use, firmware, reboot count, and a restart button
 
 ## Install

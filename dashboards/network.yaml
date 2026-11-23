@@ -495,6 +495,21 @@ sections:
             th:nth-child(3), td:nth-child(3) { display: none; }
         grid_options:
           columns: full
+      - type: tile
+        entity: button.giga_hub_clear_new_devices
+        name: Clear new devices
+        # The list also clears itself: arrivals drop off after a week.
+        visibility:
+          - condition: state
+            entity: sensor.giga_hub_newest_device
+            state_not: [unknown, unavailable]
+        tap_action:
+          action: perform-action
+          perform_action: button.press
+          target:
+            entity_id: button.giga_hub_clear_new_devices
+          confirmation:
+            text: Clear the new devices list?
 
   - type: grid
     cards:
@@ -514,6 +529,15 @@ sections:
       - type: tile
         entity: sensor.giga_hub_lan_port_2_link_speed
         name: LAN port 2
+      - type: tile
+        entity: sensor.giga_hub_lan_port_3_link_speed
+        name: LAN port 3
+      - type: tile
+        entity: sensor.giga_hub_lan_port_4_link_speed
+        name: LAN port 4
+      - type: tile
+        entity: sensor.giga_hub_lan_port_5_link_speed
+        name: LAN port 5
       - type: tile
         entity: button.giga_hub_restart
         name: Restart hub

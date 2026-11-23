@@ -37,6 +37,7 @@ LEDGER_SAVE_DELAY = 60  # seconds; the ledger changes every poll, so debounce wr
 FIBRE_WINDOW = 20
 INTERNET_WINDOW = 60
 RECENT_NEW_DEVICES = 25
+RECENT_NEW_DEVICE_DAYS = 7  # arrivals drop off the list after this
 
 
 @dataclass(slots=True)
@@ -166,7 +167,8 @@ class GigaHubSlowCoordinator(DataUpdateCoordinator[SlowSnapshot]):
 
         The first run seeds the set from the hub's own device history, so installing
         the integration doesn't announce every device in the house. The most recent
-        arrivals are kept too, for the "Newest device" sensor and its list.
+        arrivals are kept too, for the "Newest device" sensor and its list, until they're
+        a week old or someone presses "Clear new devices".
         """
         if self._known is None:
             stored = await self._store.async_load() or {}
@@ -193,7 +195,28 @@ class GigaHubSlowCoordinator(DataUpdateCoordinator[SlowSnapshot]):
                 for h in new
             ]
             self.recent_new_devices = (arrivals + self.recent_new_devices)[:RECENT_NEW_DEVICES]
+        if self._expire_recent() or new:
             await self._save_known()
+
+    def _expire_recent(self) -> bool:
+        """Drop arrivals older than a week. Returns True if any were dropped."""
+        cutoff = dt_util.utcnow() - timedelta(days=RECENT_NEW_DEVICE_DAYS)
+        kept = [
+            d
+            for d in self.recent_new_devices
+            if (joined := dt_util.parse_datetime(d.get("time") or "")) and joined >= cutoff
+        ]
+        dropped = len(kept) != len(self.recent_new_devices)
+        self.recent_new_devices = kept
+        return dropped
+
+    async def async_clear_recent_new_devices(self) -> None:
+        """Empty the "New devices" list. Devices already seen still aren't new again."""
+        if self._known is None:  # not loaded yet; saving now would forget every device
+            return
+        self.recent_new_devices = []
+        await self._save_known()
+        self.async_update_listeners()
 
     async def _save_known(self) -> None:
         await self._store.async_save({"macs": sorted(self._known or ()), "recent": self.recent_new_devices})

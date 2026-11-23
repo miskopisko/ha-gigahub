@@ -26,7 +26,7 @@ from . import GigaHubConfigEntry
 from .const import CONF_DEVICE_NAMES, DOMAIN
 from .coordinator import GigaHubSlowCoordinator
 from .entity import hub_device_info
-from .parse import Host, SlowSnapshot
+from .parse import Host, SlowSnapshot, is_pod
 
 BAND_LABEL = {"2g4": "2.4 GHz", "5g": "5 GHz", "6g": "6 GHz"}
 BUSY_THRESHOLD_MBPS = 0.1
@@ -69,10 +69,7 @@ def pod_hosts(s: SlowSnapshot) -> list[Host]:
     return [
         h
         for h in s.active_hosts
-        if h.interface_type == "WiFi"
-        and h.mac not in on_hub
-        and h.mac not in tv
-        and "pod" not in h.name.lower()
+        if h.interface_type == "WiFi" and h.mac not in on_hub and h.mac not in tv and not is_pod(h)
     ]
 
 

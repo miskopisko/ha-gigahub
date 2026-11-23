@@ -23,6 +23,9 @@
     "button": {
       "run_speed_test": {
         "default": "mdi:speedometer"
+      },
+      "clear_new_devices": {
+        "default": "mdi:playlist-remove"
       }
     },
     "event": {

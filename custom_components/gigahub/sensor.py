@@ -410,7 +410,9 @@ def _band_slow(band: str) -> tuple[SlowSensorDescription, ...]:
     )
 
 
-def _port(number: int, enabled: bool) -> tuple[FastSensorDescription, ...]:
+def _port(number: int, up: bool) -> tuple[FastSensorDescription, ...]:
+    """Link speed for every port (so a dashboard can show them all); traffic only for
+    ports in use when the integration was set up."""
     label = {"port": str(number)}
 
     def port(d: FastData):
@@ -423,7 +425,6 @@ def _port(number: int, enabled: bool) -> tuple[FastSensorDescription, ...]:
             translation_placeholders=label,
             device_class=SensorDeviceClass.DATA_RATE,
             native_unit_of_measurement=UnitOfDataRate.MEGABITS_PER_SECOND,
-            entity_registry_enabled_default=enabled,
             value_fn=lambda d: p.speed_mbps if (p := port(d)) else None,
             attrs_fn=lambda d: {"status": p.status} if (p := port(d)) else {},
         ),
@@ -431,13 +432,13 @@ def _port(number: int, enabled: bool) -> tuple[FastSensorDescription, ...]:
             f"port_{number}_download",
             "port_download",
             translation_placeholders=label,
-            entity_registry_enabled_default=enabled,
+            entity_registry_enabled_default=up,
         ),
         _rate(
             f"port_{number}_upload",
             "port_upload",
             translation_placeholders=label,
-            entity_registry_enabled_default=enabled,
+            entity_registry_enabled_default=up,
         ),
     )
 
@@ -504,7 +505,7 @@ async def async_setup_entry(
             fast_descriptions.extend(_band_fast(band))
             slow_descriptions.extend(_band_slow(band))
     for port in fast.data.snapshot.ports:
-        fast_descriptions.extend(_port(port.number, enabled=port.status == "UP"))
+        fast_descriptions.extend(_port(port.number, up=port.status == "UP"))
 
     entities: list[SensorEntity] = []
     for description in fast_descriptions:

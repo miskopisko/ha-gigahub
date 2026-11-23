@@ -84,6 +84,9 @@
     "button": {
       "run_speed_test": {
         "name": "Run speed test"
+      },
+      "clear_new_devices": {
+        "name": "Clear new devices"
       }
     },
     "event": {

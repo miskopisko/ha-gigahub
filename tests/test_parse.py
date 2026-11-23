@@ -547,3 +547,45 @@ def test_device_traffic_survives_reconnect_and_restart() -> None:
     assert later["aa"].download_mbps is None  # no timing reference after a restart
     assert restored.totals("aa") == (980 * MB, 0)
     assert restored.totals("bb") is None
+
+
+def _wired(mac: str, name: str, phy: int, active: bool = True) -> dict:
+    return {
+        "phys_address": mac,
+        "host_name": name,
+        "active": active,
+        "interface_type": "Ethernet",
+        "layer1_interface": f"Device/Ethernet/Interfaces/Interface[PHY{phy}]",
+    }
+
+
+def test_devices_on_a_wired_pod_count_as_wifi() -> None:
+    hosts = [
+        _wired("AA:AA:AA:00:00:01", "PG9090088E_Pod_945116900", 4),
+        # Joined the pod, reported as Ethernet on the pod's port.
+        _wired("AA:AA:AA:00:00:02", "Nest Connect", 4),
+        # Really wired, on another port.
+        _wired("AA:AA:AA:00:00:03", "nas", 1),
+        # An iPod is not a pod.
+        _wired("AA:AA:AA:00:00:04", "Bobs-iPod", 2),
+        _wired("AA:AA:AA:00:00:05", "printer", 2),
+    ]
+    snap = parse.parse_slow({"hosts": hosts}, {})
+    by_name = {h.name: h for h in snap.hosts}
+    assert (by_name["Nest Connect"].interface_type, by_name["Nest Connect"].port) == ("WiFi", None)
+    assert (by_name["PG9090088E_Pod_945116900"].interface_type, by_name["PG9090088E_Pod_945116900"].port) == (
+        "Ethernet",
+        4,
+    )
+    assert [by_name[n].interface_type for n in ("nas", "Bobs-iPod", "printer")] == ["Ethernet"] * 3
+    assert parse.is_pod(by_name["PG9090088E_Pod_945116900"])
+    assert not parse.is_pod(by_name["Bobs-iPod"])
+
+
+def test_offline_pod_leaves_its_old_port_alone() -> None:
+    hosts = [
+        _wired("AA:AA:AA:00:00:01", "PG9090088E_Pod_945116900", 3, active=False),
+        _wired("AA:AA:AA:00:00:02", "desktop", 3),
+    ]
+    snap = parse.parse_slow({"hosts": hosts}, {})
+    assert snap.hosts[1].interface_type == "Ethernet" and snap.hosts[1].port == 3

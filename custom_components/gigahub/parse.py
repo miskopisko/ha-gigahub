@@ -772,6 +772,33 @@ def fix_stale_ips(hosts: list[Host], leases: dict[str, str]) -> None:
             host.ip = None
 
 
+_POD_RE = re.compile(r"(?:^|[^a-z])pod(?:[^a-z]|$)", re.IGNORECASE)
+
+
+def is_pod(host: Host) -> bool:
+    """Bell's Wi-Fi pods name themselves like "PG9090088E_Pod_945116900" ("iPod" doesn't count)."""
+    return any(name and _POD_RE.search(name) for name in (host.hub_name, host.name))
+
+
+def fix_wired_pod_clients(hosts: list[Host]) -> None:
+    """Put devices on a wired pod back on Wi-Fi.
+
+    With a pod plugged into a LAN port, the hub reports devices that join the pod as
+    Ethernet on the pod's port. So any Ethernet device on the same port as a pod is
+    treated as a Wi-Fi device on that pod. A device wired into the pod's spare port
+    would be listed under the pod too.
+    """
+    pod_ports = {
+        h.port
+        for h in hosts
+        if h.active and h.interface_type == "Ethernet" and h.port is not None and is_pod(h)
+    }
+    for host in hosts:
+        if host.interface_type == "Ethernet" and host.port in pod_ports and not is_pod(host):
+            host.interface_type = "WiFi"
+            host.port = None
+
+
 def parse_slow(
     raw: dict[str, Any],
     access_points: dict[int, str],
@@ -779,6 +806,7 @@ def parse_slow(
 ) -> SlowSnapshot:
     hosts = parse_hosts(raw.get("hosts"))
     fix_stale_ips(hosts, parse_dhcp_leases(raw.get("dhcp_leases")))
+    fix_wired_pod_clients(hosts)
     clients: list[WifiClient] = []
     for uid, band in access_points.items():
         clients.extend(parse_wifi_clients(raw.get(f"ap_{uid}"), band, uid in tv_access_points))
